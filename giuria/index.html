@@ -157,7 +157,7 @@ window.NWS_CIRCUITO = {
   <div class="scan" id="scan" hidden>
     <div class="card"><h2 id="sc-title">Scheda</h2>
       <div class="cv-wrap"><canvas id="cv"></canvas></div>
-      <p class="hint">Verde = cerchio pieno · arancio = dubbio. Tocca un cerchio per correggerne la lettura.</p></div>
+      <p class="hint">Verde = pieno · arancio = dubbio · blu = segnato a mano · grigio barrato = tolto a mano. Tocca un cerchio per correggerlo, toccalo di nuovo per annullare.</p></div>
     <div class="card"><h2>Voti letti</h2><div id="sc-sum"></div><div id="sc-table"></div></div>
   </div>
   <div class="card"><h2>Schede lette in questa sessione</h2><div class="list" id="readList"><p class="hint">Nessuna.</p></div></div>
@@ -190,7 +190,7 @@ window.NWS_CIRCUITO = {
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
 <script>
 'use strict';
-const VERSION = '0.4.1';
+const VERSION = '0.4.2';
 document.getElementById('ver').textContent = VERSION;
 const OPENCV_URL = 'https://cdn.jsdelivr.net/npm/@techstark/opencv-js@4.10.0-release.1/dist/opencv.js';
 
@@ -1180,11 +1180,17 @@ function drawOverlay(res){
   const ctx = cvs.getContext('2d'); ctx.drawImage(w, 0, 0);
   res.L.bubbles.forEach(b => {
     const st = b.ovr || b.state; if (st === 'E' && !b.ovr) return;
-    ctx.lineWidth = 3;
-    ctx.strokeStyle = st === 'F' ? (b.ovr ? '#0a84ff' : '#1e8a4c') : st === 'D' ? '#f39c12' : '#0a84ff';
-    ctx.fillStyle = st === 'F' ? 'rgba(30,138,76,.25)' : 'rgba(243,156,18,.25)';
-    ctx.beginPath(); ctx.arc((b.cx + (b.ox||0))*S, (b.cy + (b.oy||0))*S, b.r*S + 3, 0, Math.PI*2);
-    if (st !== 'E') ctx.fill(); ctx.stroke();
+    const x = (b.cx + (b.ox||0))*S, y = (b.cy + (b.oy||0))*S, R = b.r*S + 3;
+    ctx.lineWidth = 3; ctx.setLineDash([]);
+    if (b.ovr === 'E'){   // tolto a mano: grigio barrato
+      ctx.fillStyle = 'rgba(255,255,255,.7)'; ctx.strokeStyle = '#6b7280'; ctx.setLineDash([5, 4]);
+      ctx.beginPath(); ctx.arc(x, y, R, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+      ctx.setLineDash([]); ctx.beginPath(); ctx.moveTo(x - R*.7, y + R*.7); ctx.lineTo(x + R*.7, y - R*.7); ctx.stroke();
+      return;
+    }
+    ctx.strokeStyle = b.ovr ? '#0a84ff' : st === 'F' ? '#1e8a4c' : '#f39c12';
+    ctx.fillStyle = b.ovr ? 'rgba(10,132,255,.3)' : st === 'F' ? 'rgba(30,138,76,.25)' : 'rgba(243,156,18,.25)';
+    ctx.beginPath(); ctx.arc(x, y, R, 0, Math.PI*2); ctx.fill(); ctx.stroke();
   });
 }
 $('cv').addEventListener('click', e => {
@@ -1192,7 +1198,9 @@ $('cv').addEventListener('click', e => {
   const rect = e.target.getBoundingClientRect(), x = (e.clientX - rect.left) * (e.target.width / rect.width) / S, y = (e.clientY - rect.top) * (e.target.height / rect.height) / S;
   const b = CUR.L.bubbles.find(b => Math.hypot(b.cx + (b.ox||0) - x, b.cy + (b.oy||0) - y) <= b.r + .4);
   if (!b) return;
-  const cur = b.ovr || b.state; b.ovr = cur === 'F' ? 'E' : 'F';
+  // ogni tocco fa un passo e poi torna alla lettura automatica: vuoto → segnato → auto; pieno → tolto → auto; dubbio → pieno → vuoto → auto
+  const next = {E: ['F'], F: ['E'], D: ['F', 'E']}[b.state], i = b.ovr ? next.indexOf(b.ovr) + 1 : 0;
+  if (i < next.length) b.ovr = next[i]; else delete b.ovr;
   evaluate(CUR); saveReading(CUR); showRead(CUR); renderReadList();
 });
 function digitImgs(res, r, g){
