@@ -1,0 +1,2930 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#0a0e17">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="manifest" href="./manifest.json">
+<title>NW Style 2027 · demo · Classifiche</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://unpkg.com/tesseract.js@5/dist/tesseract.min.js"></script>
+<style>
+:root{--bg:#ffffff;--s1:#f5f5f5;--s2:#ececec;--s3:#e0e0e0;--brd:#cccccc;--red:#e63329;--red2:#c0251b;--tx:#111111;--tx2:#444444;--tx3:#888888;--nord:#0077aa;--cs:#cc7700;--sic:#6633aa;--ti:#0055cc;--grn:#1a8a4a;--yel:#cc7700;--fh:'Barlow Condensed',sans-serif;--fb:'DM Sans',sans-serif}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;background:var(--bg);color:var(--tx);font-family:var(--fb);font-size:14px}
+::-webkit-scrollbar{width:6px;height:6px}::-webkit-scrollbar-track{background:var(--s1)}::-webkit-scrollbar-thumb{background:var(--brd);border-radius:3px}
+#app{display:flex;flex-direction:column;height:100vh}
+#hdr{background:var(--s1);border-bottom:1px solid var(--brd);padding:0 20px;display:flex;align-items:center;gap:16px;flex-shrink:0;height:56px}
+.logo{font-family:var(--fh);font-weight:800;font-size:20px;letter-spacing:1px}.logo span{color:var(--red)}
+#nav{display:flex;gap:2px;flex:1;overflow-x:auto}
+.nb{font-family:var(--fh);font-weight:600;font-size:13px;letter-spacing:.5px;padding:6px 14px;border:none;background:transparent;color:var(--tx3);cursor:pointer;border-radius:6px;transition:all .2s;white-space:nowrap;display:flex;align-items:center;gap:6px}
+.nb:hover{background:var(--s2);color:var(--tx2)}.nb.active{background:var(--s3);color:var(--tx)}
+.dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+#content{flex:1;overflow-y:auto;padding:20px}
+.card{background:var(--s1);border:1px solid var(--brd);border-radius:12px;padding:20px}
+.ct{font-family:var(--fh);font-weight:700;font-size:16px;letter-spacing:.5px;margin-bottom:16px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.g4{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+.badge{display:inline-flex;align-items:center;padding:3px 10px;border-radius:20px;font-family:var(--fh);font-size:11px;font-weight:700;letter-spacing:.5px}
+.fg{margin-bottom:14px}
+label{display:block;font-size:11px;font-weight:600;color:var(--tx3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px}
+select,input[type=text]{width:100%;padding:10px 12px;background:var(--s2);border:1px solid var(--brd);border-radius:8px;color:var(--tx);font-family:var(--fb);font-size:13px;outline:none;transition:border-color .2s}
+select:focus,input:focus{border-color:var(--red)}select option{background:var(--s2)}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:9px 18px;border:none;border-radius:8px;font-family:var(--fh);font-weight:700;font-size:13px;letter-spacing:.5px;cursor:pointer;transition:all .2s}
+.bp{background:var(--red);color:#fff}.bp:hover{background:var(--red2)}
+.bs2{background:var(--s2);color:var(--tx2);border:1px solid var(--brd)}.bs2:hover{background:var(--s3);color:var(--tx)}
+.bg{background:transparent;color:var(--tx3);border:1px solid var(--brd)}.bg:hover{background:var(--s2);color:var(--tx)}
+.bsm{padding:6px 12px;font-size:12px}
+.tw{overflow-x:auto;border-radius:8px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+thead tr{background:var(--s2)}
+thead th{padding:10px 12px;text-align:left;font-family:var(--fh);font-weight:700;font-size:11px;letter-spacing:.8px;color:var(--tx2);text-transform:uppercase;border-bottom:1px solid var(--brd)}
+tbody tr{border-bottom:1px solid rgba(42,61,92,.5);transition:background .1s}
+tbody tr:hover{background:rgba(255,255,255,.03)}
+tbody td{padding:9px 12px;color:var(--tx)}
+tbody tr.hl{background:rgba(230,51,41,.08)!important}
+tbody tr.hl:hover{background:rgba(230,51,41,.12)!important}
+/* Tabella classifica: colonne calibrate sul contenuto reale */
+table.tcomp{table-layout:fixed;min-width:920px}
+table.tcomp thead th{padding:9px 5px;letter-spacing:.4px}
+table.tcomp tbody td{padding:8px 5px}
+table.tcomp thead th:nth-child(2),table.tcomp thead th:nth-child(3),
+table.tcomp tbody td:nth-child(2),table.tcomp tbody td:nth-child(3){padding-left:11px;padding-right:11px}
+table.tcomp tbody td:nth-child(2),table.tcomp tbody td:nth-child(3){overflow:hidden;text-overflow:ellipsis}
+.pb{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:6px;font-family:var(--fh);font-weight:800;font-size:13px}
+.p1{background:rgba(251,191,36,.2);color:var(--yel)}.p2{background:rgba(160,176,204,.15);color:#a0b0c0}.p3{background:rgba(180,130,90,.15);color:#c8905a}.px{background:var(--s2);color:var(--tx3)}
+.pts{font-family:var(--fh);font-weight:700;font-size:15px}
+.uz{border:2px dashed var(--brd);border-radius:12px;padding:32px;text-align:center;cursor:pointer;transition:all .2s;background:var(--s1)}
+.uz:hover,.uz.dv{border-color:var(--red);background:rgba(230,51,41,.05)}.uz input{display:none}
+.spin{width:32px;height:32px;border:3px solid var(--brd);border-top-color:var(--red);border-radius:50%;animation:sp .8s linear infinite;margin:0 auto}
+@keyframes sp{to{transform:rotate(360deg)}}
+.sl{text-align:center;padding:32px;color:var(--tx2)}.se{text-align:center;padding:40px;color:var(--tx3);font-size:13px}
+#mo{position:fixed;inset:0;background:rgba(0,0,0,.8);backdrop-filter:blur(4px);z-index:1000;display:none;align-items:center;justify-content:center;padding:20px}
+#mo.open{display:flex}
+#mb{background:var(--s1);border:1px solid var(--brd);border-radius:16px;max-width:920px;width:100%;max-height:90vh;overflow-y:auto;animation:mi .2s ease}
+@keyframes mi{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+.mh{padding:20px 24px;border-bottom:1px solid var(--brd);display:flex;align-items:center;justify-content:space-between;font-family:var(--fh);font-weight:700;font-size:18px;position:sticky;top:0;background:var(--s1);z-index:1}
+.mbody{padding:24px}.mf{padding:16px 24px;border-top:1px solid var(--brd);display:flex;gap:10px;justify-content:flex-end}
+.xb{background:none;border:none;color:var(--tx3);cursor:pointer;font-size:20px;padding:4px}.xb:hover{color:var(--tx)}
+.sc{background:var(--s1);border:1px solid var(--brd);border-radius:10px;padding:16px}
+.sl2{font-size:11px;color:var(--tx3);font-weight:600;text-transform:uppercase;letter-spacing:.7px;margin-bottom:6px}
+.sv{font-family:var(--fh);font-weight:800;font-size:28px}.ss{font-size:11px;color:var(--tx3);margin-top:4px}
+.ti-item{background:var(--s2);border:1px solid var(--brd);border-radius:8px;padding:12px 16px;display:flex;align-items:center;gap:12px;margin-bottom:8px}
+.qy{background:rgba(52,211,153,.15);color:var(--grn);border:1px solid rgba(52,211,153,.3);border-radius:6px;padding:2px 8px;font-size:11px;font-weight:700}
+.qm{background:rgba(251,191,36,.15);color:var(--yel);border:1px solid rgba(251,191,36,.3);border-radius:6px;padding:2px 8px;font-size:11px;font-weight:700}
+.qn{background:var(--s2);color:var(--tx3);border:1px solid var(--brd);border-radius:6px;padding:2px 8px;font-size:11px}
+.ec{width:100%;background:var(--s2);border:1px solid transparent;border-radius:4px;color:var(--tx);font-family:var(--fb);font-size:12px;padding:4px 6px;outline:none}
+.ec:focus{border-color:var(--red)}
+.ec.err{border-color:var(--red);background:rgba(230,51,41,.14);font-weight:600}
+.ec.err:focus{background:var(--s2)}
+.ec.cfl{border-color:#f59e0b;background:rgba(251,191,36,.16)}
+.alt{display:inline-block;margin-left:4px;padding:1px 5px;border-radius:4px;background:#fbbf24;color:#7c2d12;font-size:11px;font-weight:700;cursor:pointer;vertical-align:middle}
+.alt:hover{background:#f59e0b;color:#fff}
+.okr{color:#10b981;font-size:11px;margin-left:3px}
+.div{height:1px;background:var(--brd);margin:20px 0}
+.tg{display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap}
+.tb{padding:6px 14px;border-radius:20px;border:1px solid var(--brd);background:transparent;color:var(--tx3);cursor:pointer;font-size:12px;font-family:var(--fh);font-weight:600;letter-spacing:.5px;transition:all .2s}
+.eb{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:16px}
+.al{border-radius:8px;padding:12px 16px;font-size:13px;margin-bottom:16px}
+.ai{background:rgba(96,165,250,.1);border:1px solid rgba(96,165,250,.3);color:var(--ti)}
+.aw{background:rgba(251,191,36,.1);border:1px solid rgba(251,191,36,.3);color:var(--yel)}
+.ae{background:rgba(230,51,41,.1);border:1px solid rgba(230,51,41,.3);color:var(--red2)}
+.ao{background:rgba(52,211,153,.1);border:1px solid rgba(52,211,153,.3);color:var(--grn)}
+.rd{cursor:pointer;color:var(--tx3);font-size:14px}.rd:hover{color:var(--red)}
+.ocr-prog{height:6px;background:var(--brd);border-radius:3px;margin-top:10px;overflow:hidden}
+.ocr-prog-bar{height:100%;background:var(--red);border-radius:3px;transition:width .3s;width:0%}
+@media(max-width:768px){.g2,.g4{grid-template-columns:1fr}#hdr{padding:0 12px}#content{padding:12px}}
+</style>
+</head>
+<body>
+<div id="sw-toast" style="display:none;position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#1e293b;color:#fff;padding:12px 20px;border-radius:10px;font-size:13px;z-index:9999;align-items:center;gap:12px;box-shadow:0 4px 16px rgba(0,0,0,.4)"><span>&#x1F504; Nuova versione disponibile</span><button onclick="location.reload()" style="background:#e63329;color:#fff;border:none;padding:6px 14px;border-radius:6px;font-size:12px;cursor:pointer;font-weight:600">Aggiorna</button></div>
+<div id="app">
+  <header id="hdr">
+    <div class="logo">NW <span>STYLE</span> 2026</div>
+    <nav id="nav">
+      <button class="nb active" onclick="goTab('dashboard')" id="t-dashboard"><span class="dot" style="background:#e63329"></span>Dashboard</button>
+      <button class="nb" onclick="goTab('upload')" id="t-upload"><span class="dot" style="background:#60a5fa"></span>Carica Tappa</button>
+      <button class="nb" onclick="goTab('manuale')" id="t-manuale"><span class="dot" style="background:#16a34a"></span>Manuale/Excel</button>
+      <button class="nb" onclick="goTab('classifiche')" id="t-classifiche"><span class="dot" style="background:#22d3ee"></span>Classifiche</button>
+      <button class="nb" onclick="goTab('finalissima')" id="t-finalissima"><span class="dot" style="background:#fbbf24"></span>Finalissima</button>
+      <button class="nb" onclick="goTab('atleta')" id="t-atleta"><span class="dot" style="background:#8b5cf6"></span>Atleta</button>
+      <button class="nb" onclick="goTab('asd')" id="t-asd"><span class="dot" style="background:#34d399"></span>ASD</button>
+      <button class="nb" onclick="goTab('settings')" id="t-settings"><span class="dot" style="background:#a78bfa"></span>Impostazioni</button>
+    </nav>
+  </header>
+  <main id="content">
+    <div style="background:#fff4d6;color:#5c4100;border-bottom:1px solid #e8c66a;padding:8px 20px;font-size:13px;display:flex;gap:14px;flex-wrap:wrap;align-items:center">
+<b>DEMO 2027 per il comitato</b><span>Dati di prova, salvati solo nel tuo browser.</span>
+<a href="../" style="color:#5c4100">← Torna alla presentazione</a><a href="../giuria/" style="color:#5c4100">Giuria di tappa</a>
+<a href="#" onclick="NWSDemoDB.reset();location.reload();return false" style="color:#5c4100">Ricomincia da capo</a></div>
+<div id="public-banner" style="display:none;background:rgba(96,165,250,.1);border-bottom:1px solid rgba(96,165,250,.3);padding:8px 20px;font-size:12px;color:var(--ti);align-items:center;gap:8px;flex-shrink:0">&#x1F512; <strong>Modalità pubblica</strong> &mdash; sola lettura. Caricamento e modifiche disabilitati.</div>
+    <div id="v-dashboard"></div>
+    <div id="v-upload" style="display:none"></div>
+    <div id="v-manuale" style="display:none"></div>
+    <div id="v-classifiche" style="display:none"></div>
+    <div id="v-finalissima" style="display:none"></div>
+    <div id="v-atleta" style="display:none"></div>
+    <div id="v-asd" style="display:none"></div>
+    <div id="v-settings" style="display:none"></div>
+  </main>
+</div>
+<div id="mo"><div id="mb">
+  <div class="mh"><span id="mt">Revisione OCR</span><button class="xb" onclick="closeModal()">&#x2715;</button></div>
+  <div class="mbody" id="mbody"></div>
+  <div class="mf" id="mfoot"></div>
+</div></div>
+<script>window.NWS_DEMO_SHIM = true;</script>
+<script src="../demo-db.js"></script>
+<script>
+var STAGES=[
+  {"id": "bologna-ti", "name": "Tappa Italia 2027 (demo)", "date": "2027-04-11", "circuits": ["ti", "nord", "cs", "sic"], "jollyFor": [], "label": "Tappa Italia"},
+  {"id": "demo-padova", "name": "Padova (demo)", "date": "2027-05-16", "circuits": ["nord"], "jollyFor": [], "label": "Nord"},
+  {"id": "demo-mestre", "name": "Mestre (demo)", "date": "2027-09-12", "circuits": ["nord"], "jollyFor": [], "label": "Nord"},
+  {"id": "san-dona", "name": "Finalissima 2027 (demo)", "date": "2027-10-17", "circuits": ["fin"], "jollyFor": [], "label": "Finalissima"}
+];
+var CATS=[
+  {id:'istruttore-m',name:'Istruttori',short:'Istruttori',oldShort:'Istr.M',type:'ind'},
+  {id:'istruttore-f',name:'Istruttrici',short:'Istruttrici',oldShort:'Istr.F',type:'ind'},
+  {id:'camminatore-m',name:'Camminatori',short:'Camminatori',oldShort:'Camm.M',type:'ind'},
+  {id:'camminatore-f',name:'Camminatrici',short:'Camminatrici',oldShort:'Camm.F',type:'ind'},
+  {id:'coppia-istr',name:'Coppie Istruttori',short:'C.Istr',type:'cop'},
+  {id:'coppia-camm',name:'Coppie Camminatori',short:'C.Camm',type:'cop'},
+  {id:'coppia-miste',name:'Coppie Miste',short:'C.Miste',type:'cop'}
+];
+var CIR={
+  ti:{name:'Tappa Italia',color:'var(--ti)'},
+  nord:{name:'Circuito Nord',color:'var(--nord)'},
+  cs:{name:'Centro-Sud',color:'var(--cs)'},
+  sic:{name:'Sicilia',color:'var(--sic)'},
+  fin:{name:'Finalissima',color:'var(--red)'}
+};
+var QLIM={
+  nord:{def:10,'camminatore-f':15},
+  cs:{def:10,'camminatore-f':15},
+  sic:{def:5,'camminatore-f':10}
+};
+
+var SUPA_URL='https://oykewinjysrgnhdpkabs.supabase.co';
+var SUPA_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im95a2V3aW5qeXNyZ25oZHBrYWJzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQyMTAxNTcsImV4cCI6MjA4OTc4NjE1N30.18ntvRaxidMZrxMO9XJuUbThxQYN0h3m5HboUcpqaaU';
+
+var DB={settings:{asdHighlight:'Nordic Laguna'},results:{}};
+
+function loadSettings(){try{var r=localStorage.getItem('nws2027demo_settings');if(r)DB.settings=JSON.parse(r);}catch(e){}}
+function saveSettings2(){try{localStorage.setItem('nws2027demo_settings',JSON.stringify(DB.settings));}catch(e){}}
+
+function supaHeaders(){return{'Content-Type':'application/json','apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY};}
+
+function rKey(s,c){return s+'__'+c;}
+
+async function loadAllResults(){
+  try{
+    var resp=await fetch(SUPA_URL+'/rest/v1/risultati?select=*',{headers:supaHeaders()});
+    var data=await resp.json();
+    DB.results={};
+    if(Array.isArray(data)){
+      data.forEach(function(r){
+        DB.results[r.id]={stageId:r.stage_id,catId:r.cat_id,rows:r.rows,savedAt:r.saved_at};
+      });
+    }
+  }catch(e){console.error('loadAllResults error',e);}
+}
+
+async function saveRes(s,c,rows){
+  var id=rKey(s,c);
+  DB.results[id]={stageId:s,catId:c,rows:rows,savedAt:new Date().toISOString()};
+  try{
+    await fetch(SUPA_URL+'/rest/v1/risultati',{
+      method:'POST',
+      headers:Object.assign({},supaHeaders(),{'Prefer':'resolution=merge-duplicates'}),
+      body:JSON.stringify({id:id,stage_id:s,cat_id:c,rows:rows})
+    });
+  }catch(e){console.error('saveRes error',e);}
+}
+
+function getRes(s,c){return DB.results[rKey(s,c)];}
+function hasRes(s,c){return !!DB.results[rKey(s,c)];}
+
+async function deleteAllResults(){
+  await fetch(SUPA_URL+'/rest/v1/risultati?id=neq.null',{method:'DELETE',headers:supaHeaders()});
+  DB.results={};
+}
+
+// ── FIX 1: getStandings con filtro TI rigoroso ───────────────
+// ── FIX 5: circuitKeys ora rispetta l'ASD del circuito, non solo il nome ──
+// Prima di questo fix, un atleta con ASD di un ALTRO circuito ma che aveva
+// gareggiato "fisicamente" in una tappa normale di questo circuito (es. per
+// una tappa aperta a tutti come Palermo) veniva comunque considerato come
+// "presente nel circuito", bypassando il controllo ASD sulla riga di Tappa
+// Italia e facendo così apparire il suo punteggio TI nel circuito sbagliato.
+function getStandings(cirId,catId){
+  var cat=CATS.find(function(c){return c.id===catId;});
+  var stgs=STAGES.filter(function(s){return s.circuits.indexOf(cirId)>=0&&s.id!=='san-dona';});
+  var map={};
+  // Pre-calcola le chiavi (nome/coppia) di chi ha già risultati nelle tappe NORMALI del circuito
+  // E la cui ASD non è esplicitamente assegnata a un circuito diverso.
+  // Serve per la TI: se assoc è vuoto, includiamo nella classifica di un circuito solo
+  // chi ha disputato almeno una tappa normale di quel circuito con un'ASD coerente.
+  var circuitKeys={};
+  if(cirId!=='ti'){
+    stgs.filter(function(s){return !isTappaItalia(s.id);}).forEach(function(s){
+      var r2=getRes(s.id,catId);
+      if(!r2)return;
+      r2.rows.forEach(function(row2){
+        var asdCir2=getASDCircuito(row2.assoc||'');
+        // Salta la riga se l'ASD è esplicitamente di un ALTRO circuito
+        if(asdCir2!=='nd'&&asdCir2!=='tutti'&&asdCir2!==cirId) return;
+        var k=cat.type==='cop'
+          ?pairKey(row2.p1,row2.p2)
+          :indKey(row2.cognome,row2.nome);
+        circuitKeys[k]=true;
+      });
+    });
+  }
+  for(var si=0;si<stgs.length;si++){
+    var st=stgs[si];
+    var res=getRes(st.id,catId);
+    if(!res)continue;
+    var jolly=st.jollyFor.indexOf(cirId)>=0;
+    for(var ri=0;ri<res.rows.length;ri++){
+      var row=res.rows[ri];
+      // Filtro per circuito ASD
+      if(cirId!=='ti'){
+        var asdCir=getASDCircuito(row.assoc||'');
+        if(isTappaItalia(st.id)){
+          // TI: includi se ha tappe normali nel circuito OPPURE ASD esplicitamente del circuito/'tutti'
+          // ASD 'nd' (vuota) senza tappe normali → escludi (circuito non determinabile)
+          var rowKey=cat.type==='cop'
+            ?pairKey(row.p1,row.p2)
+            :indKey(row.cognome,row.nome);
+          if(!circuitKeys[rowKey]){
+            // Nessuna tappa normale → serve ASD esplicita del circuito
+            if(asdCir!=='tutti'&&asdCir!==cirId) continue;
+          }
+        } else {
+          // Tappe normali: escludi solo se assegnata a un ALTRO circuito noto
+          if(asdCir!=='nd'&&asdCir!=='tutti'&&asdCir!==cirId) continue;
+        }
+      }
+      var key=cat.type==='cop'
+        ?pairKey(row.p1,row.p2)
+        :indKey(row.cognome,row.nome);
+      if(!map[key])map[key]={key:key,display:(cat.type==='cop'?pairDisplay(row.p1,row.p2):canonPerson(((row.cognome||'')+' '+(row.nome||'')).trim())).toUpperCase(),assoc:row.assoc||'',stages:[],total:0};
+      var pts=isTappaItalia(st.id)?posToPointsTI(row.pos):posToPoints(row.pos);
+      var used=jolly?pts*2:pts;
+      var voto=pfloat(row.tot)||pfloat(row.pts);
+      map[key].stages.push({stageId:st.id,stageName:st.name,pts:pts,ptsUsed:used,isJolly:jolly,voto:voto});
+      if(!(map[key].bestVoto>=voto))map[key].bestVoto=voto;
+      map[key].total+=used;
+      map[key].assoc=row.assoc||map[key].assoc;
+    }
+  }
+  /* Spareggio (decisione comitato Style, set. 2026): a parita' di punti prevale chi ha
+     il punteggio di tappa piu' alto, cioe' il voto totale dei giudici migliore ottenuto
+     in una singola tappa, Jolly compresa. */
+  var arr=Object.values(map).sort(function(a,b){return (b.total-a.total)||((b.bestVoto||0)-(a.bestVoto||0));});
+  return arr.map(function(a,i){a.pos=i+1;return a;});
+}
+
+function norm(s){return (s||'').trim().toLowerCase();}
+
+/* ===== ANAGRAFICA ATLETI (alias) =====
+   ATL_CANON: chiave normalizzata -> nome canonico.
+   La chiave e' normPersonRaw(): parole in minuscolo ordinate alfabeticamente,
+   quindi "MAGGIOLO GRAZIANO" e "Graziano Maggiolo" condividono la stessa chiave
+   e un solo alias copre tutte le grafie con le parole invertite.
+   Applicata SOLO IN LETTURA: i dati grezzi in "risultati" non vengono mai riscritti,
+   e togliere un alias riporta tutto com'era. */
+var ATL_CANON={};
+
+function normPersonRaw(s){
+  /* minuscolo, accenti rimossi, punteggiatura trasformata in spazio, parole ordinate.
+     Cosi' "Sbrogio ' Paola" e "Sbrogio' Paola" diventano la stessa identita', e lo stesso
+     vale per "BERNARDI PAUL (PAOLO)" e "Paul (Paolo) Bernardi". */
+  return (s||'').toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .replace(/[^a-z0-9]+/g,' ')
+    .trim().split(/\s+/).filter(Boolean).sort().join(' ');
+}
+
+/* ===== SOMIGLIANZA FRA NOMI DI PERSONA =====
+   Il confronto lettera per lettera non regge l'ordine invertito: "Paul Bernardi" e
+   "BERNARDI PAUL (PAOLO)" sono la stessa persona ma come stringhe si somigliano poco.
+   Qui si confrontano le PAROLE del nome. */
+function nameTokens(s){
+  return (s||'').toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .replace(/[^a-z0-9]+/g,' ')
+    .trim().split(/\s+/).filter(function(w){return w.length>1;});
+}
+function personSim(a,b){
+  var A=nameTokens(a), B=nameTokens(b);
+  if(!A.length||!B.length)return 0;
+  if(A.slice().sort().join(' ')===B.slice().sort().join(' '))return 1;  /* gia' la stessa identita' */
+  var conta={},comuni=0;
+  A.forEach(function(w){conta[w]=(conta[w]||0)+1;});
+  B.forEach(function(w){if(conta[w]>0){conta[w]--;comuni++;}});
+  /* un nome contenuto per intero nell'altro, con almeno due parole in comune:
+     tipicamente un secondo nome presente in una tappa e assente in un'altra */
+  if(comuni>=2&&(comuni===A.length||comuni===B.length))return 0.9;
+  var jac=comuni/(A.length+B.length-comuni);
+  return Math.max(jac, similarity(A.slice().sort().join(' '), B.slice().sort().join(' ')));
+}
+/* Per le coppie confronta i due partecipanti a due a due, in entrambi gli abbinamenti,
+   e tiene il migliore. Il punteggio della coppia e' quello del partecipante messo peggio. */
+function nameSim(a,b){
+  var A=String(a||'').split(' / '), B=String(b||'').split(' / ');
+  if(A.length===2&&B.length===2){
+    return Math.max(
+      Math.min(personSim(A[0],B[0]),personSim(A[1],B[1])),
+      Math.min(personSim(A[0],B[1]),personSim(A[1],B[0])));
+  }
+  return personSim(a,b);
+}
+function canonPerson(s){
+  var c=ATL_CANON[normPersonRaw(s)];
+  return c||((s||'').trim());
+}
+/* chiave di un atleta nelle categorie individuali */
+function indKey(cognome,nome){
+  return canonPerson(((cognome||'')+' '+(nome||'')).trim()).toLowerCase().replace(/\s+/g,' ');
+}
+
+async function loadAtletiCanon(){
+  try{
+    var resp=await fetch(SUPA_URL+'/rest/v1/atleti_canonici?select=*',{headers:supaHeaders()});
+    var data=await resp.json();
+    ATL_CANON={};
+    if(Array.isArray(data))data.forEach(function(r){ATL_CANON[r.chiave]=r.nome_canonico;});
+  }catch(e){console.error('loadAtletiCanon error',e);}
+}
+
+async function saveAtletaCanonical(nomeOcr,nomeCanon){
+  var k=normPersonRaw(nomeOcr);
+  if(!k||!nomeCanon)return;
+  ATL_CANON[k]=nomeCanon;
+  try{
+    await fetch(SUPA_URL+'/rest/v1/atleti_canonici',{
+      method:'POST',
+      headers:Object.assign({},supaHeaders(),{'Prefer':'resolution=merge-duplicates'}),
+      body:JSON.stringify({chiave:k,nome_ocr:(nomeOcr||'').trim(),nome_canonico:(nomeCanon||'').trim()})
+    });
+  }catch(e){console.error('saveAtletaCanonical error',e);}
+}
+
+async function removeAtletaCanonical(chiave){
+  delete ATL_CANON[chiave];
+  try{
+    await fetch(SUPA_URL+'/rest/v1/atleti_canonici?chiave=eq.'+encodeURIComponent(chiave),
+      {method:'DELETE',headers:supaHeaders()});
+  }catch(e){console.error('removeAtletaCanonical error',e);}
+}
+
+/* Unisce due identita' segnalate come simili.
+   Per le coppie ("A / B") allinea il partecipante che differisce, accoppiando
+   ogni nome della grafia da scartare con il piu' somigliante di quella da tenere. */
+async function mergeAnomaly(keep,drop){
+  var A=String(keep||'').split(' / '), B=String(drop||'').split(' / ');
+  if(A.length===2&&B.length===2){
+    for(var i=0;i<B.length;i++){
+      var best=null,bs=-1;
+      for(var j=0;j<A.length;j++){
+        var sc=similarity(normPersonRaw(A[j]),normPersonRaw(B[i]));
+        if(sc>bs){bs=sc;best=A[j];}
+      }
+      if(best&&normPersonRaw(best)!==normPersonRaw(B[i])) await saveAtletaCanonical(B[i],best);
+    }
+  } else {
+    await saveAtletaCanonical(drop,keep);
+  }
+}
+
+async function mergeAnomalyAndRefresh(keep,drop,btn){
+  if(btn){btn.textContent='…';btn.disabled=true;}
+  await mergeAnomaly(keep,drop);
+  renderSettings();
+}
+
+async function removeAtletaAndRefresh(chiave){
+  await removeAtletaCanonical(chiave);
+  renderSettings();
+}
+
+function buildAtletiCanonBox(){
+  var ks=Object.keys(ATL_CANON);
+  if(!ks.length)return '';
+  var righe=ks.sort(function(a,b){
+    return ATL_CANON[a].toLowerCase().localeCompare(ATL_CANON[b].toLowerCase());
+  }).map(function(k){
+    return '<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--s2);border-radius:6px;margin-bottom:6px;font-size:13px">'+
+      '<span style="color:var(--tx3);flex:1">'+esc(k)+'</span>'+
+      '<span style="color:var(--tx3)">&rarr;</span>'+
+      '<span style="font-weight:600;flex:1">'+esc(ATL_CANON[k])+'</span>'+
+      '<button class="btn bg bsm" onclick="removeAtletaAndRefresh(\''+esc(k).replace(/'/g,"\\'")+'\')">Annulla</button>'+
+      '</div>';
+  }).join('');
+  return '<div class="card" style="margin-bottom:16px;border-color:rgba(52,211,153,.3)">'+
+    '<div class="ct">&#x1F517; Anagrafica atleti ('+ks.length+' alias)</div>'+
+    '<p style="font-size:12px;color:var(--tx2);margin-bottom:12px">Grafie unificate. I dati grezzi delle tappe non sono stati modificati: togliendo un alias tutto torna come prima.</p>'+
+    righe+'</div>';
+}
+
+function normPerson(s){ return normPersonRaw(canonPerson(s)); }
+function pairKey(a,b){
+  var na=normPerson(a), nb=normPerson(b);
+  return na<=nb ? na+'/'+nb : nb+'/'+na;
+}
+function pairDisplay(a,b){
+  var na=normPerson(a), nb=normPerson(b);
+  var da=canonPerson(a), db=canonPerson(b);
+  return na<=nb ? da+' / '+db : db+' / '+da;
+}
+function levenshtein(a,b){
+  a=(a||'').toLowerCase(); b=(b||'').toLowerCase();
+  if(a===b)return 0;
+  if(!a.length)return b.length;
+  if(!b.length)return a.length;
+  var m=[];
+  for(var i=0;i<=b.length;i++)m[i]=[i];
+  for(var j=0;j<=a.length;j++)m[0][j]=j;
+  for(var i=1;i<=b.length;i++){
+    for(var j=1;j<=a.length;j++){
+      if(b.charAt(i-1)===a.charAt(j-1))m[i][j]=m[i-1][j-1];
+      else m[i][j]=Math.min(m[i-1][j-1]+1,m[i][j-1]+1,m[i-1][j]+1);
+    }
+  }
+  return m[b.length][a.length];
+}
+function similarity(a,b){
+  if(!a||!b)return 0;
+  var maxLen=Math.max(a.length,b.length);
+  if(maxLen===0)return 1;
+  return 1-(levenshtein(a,b)/maxLen);
+}
+function getAllNamesForCat(catId){
+  var cat=CATS.find(function(c){return c.id===catId;});
+  if(!cat)return [];
+  var names={};
+  Object.values(DB.results).forEach(function(res){
+    if(res.catId!==catId)return;
+    res.rows.forEach(function(row){
+      if(cat.type==='cop'){
+        var k=pairDisplay(row.p1,row.p2);
+        if(k)names[k]=true;
+      } else {
+        var k=((row.cognome||'')+' '+(row.nome||'')).trim();
+        if(k)names[k]=true;
+      }
+    });
+  });
+  return Object.keys(names);
+}
+/* Due identita' che compaiono nella STESSA tappa della stessa categoria non
+   possono essere la stessa persona: nessuno arriva primo e ventiseiesimo nella
+   stessa gara. Serve a non proporre fusioni impossibili fra omonimi. */
+function nameStagesMap(catId){
+  var cat=CATS.find(function(c){return c.id===catId;});
+  var m={};
+  if(!cat)return m;
+  Object.values(DB.results).forEach(function(res){
+    if(res.catId!==catId)return;
+    res.rows.forEach(function(row){
+      var n=cat.type==='cop'?pairDisplay(row.p1,row.p2):((row.cognome||'')+' '+(row.nome||'')).trim();
+      if(!n)return;
+      var k=normPersonRaw(n);
+      if(!m[k])m[k]={};
+      m[k][res.stageId]=true;
+    });
+  });
+  return m;
+}
+function sameStageClash(map,a,b){
+  var A=map[normPersonRaw(a)]||{}, B=map[normPersonRaw(b)]||{};
+  for(var st in A){ if(B[st])return true; }
+  return false;
+}
+
+function findSimilarName(name, catId){
+  var existing=getAllNamesForCat(catId);
+  var ignored=getIgnoredAnomalies();
+  var stagesMap=nameStagesMap(catId);
+  for(var i=0;i<existing.length;i++){
+    var ex=existing[i];
+    var sim=nameSim(ex,name);
+    if(sim>=0.85&&sim<1&&!sameStageClash(stagesMap,ex,name)){
+      var pair=[name,ex].sort().join('||');
+      if(ignored.indexOf(pair)>=0)continue;
+      return {similar:ex, score:sim};
+    }
+  }
+  return null;
+}
+function getIgnoredAnomalies(){
+  try{return JSON.parse(localStorage.getItem('nws2027demo_anomalies_ignored')||'[]');}catch(e){return [];}
+}
+function saveIgnoredAnomalies(list){
+  try{localStorage.setItem('nws2027demo_anomalies_ignored',JSON.stringify(list));}catch(e){}
+}
+function ignoreAnomaly(name1,name2){
+  var list=getIgnoredAnomalies();
+  var pair=[name1,name2].sort().join('||');
+  if(list.indexOf(pair)<0){list.push(pair);saveIgnoredAnomalies(list);}
+}
+function detectAllAnomalies(){
+  var ignored=getIgnoredAnomalies();
+  var results=[];
+  CATS.forEach(function(cat){
+    var names=getAllNamesForCat(cat.id);
+    var stagesMap=nameStagesMap(cat.id);
+    for(var i=0;i<names.length;i++){
+      for(var j=i+1;j<names.length;j++){
+        var a=names[i], b=names[j];
+        var sim=nameSim(a,b);
+        if(sim>=0.85&&sim<1&&!sameStageClash(stagesMap,a,b)){
+          var pair=[names[i],names[j]].sort().join('||');
+          if(ignored.indexOf(pair)>=0)continue;
+          results.push({cat:cat.name,catId:cat.id,name1:names[i],name2:names[j],score:sim});
+        }
+      }
+    }
+  });
+  return results.sort(function(a,b){return b.score-a.score;});
+}
+function detectRepeatedNameAnomalies(){
+  var ignored=getIgnoredAnomalies();
+  var results=[];
+  CATS.filter(function(c){return c.type==='ind';}).forEach(function(cat){
+    var seen={};
+    Object.values(DB.results).forEach(function(res){
+      if(res.catId!==cat.id)return;
+      res.rows.forEach(function(row){
+        var cog=norm(row.cognome||'');
+        var nom=norm(row.nome||'');
+        if(!cog||!nom)return;
+        var cogWords=cog.split(/\s+/).filter(function(w){return w.length>2;});
+        var nomWords=nom.split(/\s+/).filter(Boolean);
+        var hasRepeat=cogWords.some(function(w){return nomWords.indexOf(w)>=0;});
+        if(!hasRepeat)return;
+        var fullName=((row.cognome||'')+' '+(row.nome||'')).trim();
+        var pair=['__repeat__',fullName].sort().join('||');
+        if(ignored.indexOf(pair)>=0)return;
+        if(!seen[fullName]){seen[fullName]=true;results.push({cat:cat.name,catId:cat.id,name1:fullName,name2:'__repeat__',isRepeat:true,score:1});}
+      });
+    });
+  });
+  return results;
+}
+function pfloat(s){return typeof s==='number'?s:parseFloat(String(s).replace(',','.'))||0;}
+function isASD(a){if(!DB.settings.asdHighlight||!a)return false;return a.toLowerCase().indexOf(DB.settings.asdHighlight.toLowerCase())>=0;}
+
+// Modalità pubblica: ?public=1 → sola lettura
+var PUBLIC_MODE=new URLSearchParams(window.location.search).get('public')==='1';
+var activeTab='dashboard';
+var clState={circuit:'nord',cat:'istruttore-m',showASD:false};
+// FIX 3: fnState esteso con asdQuery e asdSelected
+var fnState={circuit:'nord',cat:'istruttore-m',asdQuery:'',asdSelected:''};
+var upState={stage:'',cat:''};
+
+function goTab(tab){
+  if(PUBLIC_MODE&&(tab==='upload'||tab==='manuale'||tab==='settings'||tab==='asd'))return;
+  document.querySelectorAll('.nb').forEach(function(b){b.classList.remove('active');});
+  document.getElementById('t-'+tab).classList.add('active');
+  document.querySelectorAll('#content>div').forEach(function(d){d.style.display='none';});
+  document.getElementById('v-'+tab).style.display='';
+  activeTab=tab;
+  if(tab==='dashboard')renderDash();
+  else if(tab==='upload')renderUpload();
+  else if(tab==='manuale')renderManual();
+  else if(tab==='classifiche')renderClass();
+  else if(tab==='finalissima')renderFin();
+  else if(tab==='atleta')renderAtleta();
+  else if(tab==='asd')renderASD();
+  else if(tab==='settings')renderSettings();
+}
+
+function renderDash(){
+  var el=document.getElementById('v-dashboard');
+  var myAsd=(DB.settings.asdHighlight||'').trim();
+  var cp={};
+  ['ti','nord','cs','sic'].forEach(function(cid){
+    var sts=STAGES.filter(function(s){return s.circuits.indexOf(cid)>=0&&s.id!=='san-dona';});
+    var loaded=0;
+    sts.forEach(function(s){CATS.forEach(function(c){if(hasRes(s.id,c.id))loaded++;});});
+    var missing=sts.filter(function(s){
+      return !CATS.some(function(c){return hasRes(s.id,c.id);});
+    });
+    cp[cid]={loaded:loaded,total:sts.length*CATS.length,stages:sts.length,missing:missing};
+  });
+  var lastSaved='';
+  Object.values(DB.results).forEach(function(r){if(!lastSaved||r.savedAt>lastSaved)lastSaved=r.savedAt;});
+
+  var asdBoxHtml='';
+  if(!myAsd){
+    asdBoxHtml='<div class="card" style="margin-bottom:20px;border-left:4px solid var(--red)"><div class="ct">&#x1F3C3; I miei atleti</div><div class="al ai">Imposta la tua ASD nelle <strong>Impostazioni</strong> per vedere qui i tuoi atleti.</div></div>';
+  } else {
+    var indCats=CATS.filter(function(c){return c.type==='ind';});
+    var myAthletes=[];
+    indCats.forEach(function(cat){
+      var seen={};
+      Object.values(DB.results).forEach(function(res){
+        if(res.catId!==cat.id)return;
+        res.rows.forEach(function(row){
+          if(!isASD(row.assoc||''))return;
+          var key=indKey(row.cognome,row.nome)+'__'+cat.id;
+          if(seen[key])return;
+          seen[key]=true;
+          myAthletes.push({
+            key:key,
+            display:canonPerson(((row.cognome||'')+' '+(row.nome||'')).trim()),
+            cognome:row.cognome||'',
+            nome:row.nome||'',
+            assoc:row.assoc||'',
+            catId:cat.id,
+            catName:cat.name,
+            catShort:cat.short||cat.name
+          });
+        });
+      });
+    });
+    
+    var rows=myAthletes.map(function(a){
+      var cir=getAthleteCircuit(a.assoc);
+      var rank=null,threshold=null,qualified=false;
+      if(cir){
+        var standings=getStandings(cir,a.catId);
+        var key=indKey(a.cognome,a.nome);
+        for(var i=0;i<standings.length;i++){
+          if(standings[i].key===key){
+            rank={pos:standings[i].pos,total:standings[i].total};
+            break;
+          }
+        }
+        threshold=getQualThreshold(a.catId,cir);
+        if(rank)qualified=rank.pos<=threshold;
+      }
+      return {athlete:a,cir:cir,rank:rank,threshold:threshold,qualified:qualified};
+    });
+    
+    rows.sort(function(a,b){
+      if(a.qualified!==b.qualified)return a.qualified?-1:1;
+      if(a.rank&&b.rank)return a.rank.pos-b.rank.pos;
+      return 0;
+    });
+    
+    var nTot=rows.length;
+    var nQual=rows.filter(function(r){return r.qualified;}).length;
+    
+    var bodyRows=rows.map(function(r){
+      var statusBadge='';
+      if(!r.cir){
+        statusBadge='<span style="font-size:11px;color:var(--tx3)">ASD non assegnata</span>';
+      } else if(!r.rank){
+        statusBadge='<span style="font-size:11px;color:var(--tx3)">nessuna tappa</span>';
+      } else if(r.qualified){
+        statusBadge='<span style="display:inline-block;padding:2px 8px;background:rgba(26,138,74,.15);color:var(--grn);border-radius:10px;font-size:11px;font-weight:700">&#x2705; QUALIFICATO</span>';
+      } else {
+        statusBadge='<span style="display:inline-block;padding:2px 8px;background:rgba(204,119,0,.15);color:var(--cs);border-radius:10px;font-size:11px;font-weight:700">&#x26A0;&#xFE0F; FUORI SOGLIA</span>';
+      }
+      var cirBadge=r.cir?'<span style="display:inline-block;padding:2px 8px;background:'+CIR[r.cir].color+'22;color:'+CIR[r.cir].color+';border-radius:10px;font-size:10px;font-weight:600">'+CIR[r.cir].name+'</span>':'';
+      var posCell=r.rank?'<strong style="font-size:16px">'+r.rank.pos+'&deg;</strong> <span style="font-size:11px;color:var(--tx3)">/'+(r.threshold||'-')+'</span>':'<span style="color:var(--tx3)">&mdash;</span>';
+      var ptCell=r.rank?'<span style="color:var(--red);font-weight:600">'+r.rank.total+'</span>':'<span style="color:var(--tx3)">&mdash;</span>';
+      return '<tr style="cursor:pointer" onclick="openAtleta(\''+r.athlete.key.replace(/\'/g,"\\'")+'\')"><td style="padding:10px 12px"><div style="font-weight:600">'+r.athlete.display+'</div><div style="font-size:11px;color:var(--tx3);margin-top:2px">'+r.athlete.catName+'</div></td><td style="padding:10px 12px">'+cirBadge+'</td><td style="padding:10px 12px;text-align:center">'+posCell+'</td><td style="padding:10px 12px;text-align:right">'+ptCell+'</td><td style="padding:10px 12px;text-align:right">'+statusBadge+'</td></tr>';
+    }).join('');
+    
+    var summaryHtml='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:16px">'+
+      '<div style="padding:12px;background:rgba(230,51,41,.05);border-radius:8px;text-align:center"><div style="font-size:11px;color:var(--tx3);text-transform:uppercase;letter-spacing:1px">Atleti</div><div style="font-family:var(--fh);font-weight:800;font-size:32px;color:var(--red)">'+nTot+'</div></div>'+
+      '<div style="padding:12px;background:rgba(26,138,74,.05);border-radius:8px;text-align:center"><div style="font-size:11px;color:var(--tx3);text-transform:uppercase;letter-spacing:1px">Qualificati</div><div style="font-family:var(--fh);font-weight:800;font-size:32px;color:var(--grn)">'+nQual+'</div></div>'+
+      '<div style="padding:12px;background:rgba(204,119,0,.05);border-radius:8px;text-align:center"><div style="font-size:11px;color:var(--tx3);text-transform:uppercase;letter-spacing:1px">Fuori soglia</div><div style="font-family:var(--fh);font-weight:800;font-size:32px;color:var(--cs)">'+(nTot-nQual)+'</div></div>'+
+      '</div>';
+    
+    var tableHtml=rows.length?'<div class="tw"><table width="100%"><thead><tr><th style="text-align:left">Atleta</th><th style="text-align:left">Circuito</th><th style="text-align:center">Posizione</th><th style="text-align:right">Punti</th><th style="text-align:right">Stato</th></tr></thead><tbody>'+bodyRows+'</tbody></table></div><p style="font-size:11px;color:var(--tx3);margin-top:8px">Clicca un atleta per il profilo completo.</p>':'<div class="se">Nessun atleta della tua ASD trovato nelle classifiche caricate</div>';
+    
+    asdBoxHtml='<div class="card" style="margin-bottom:20px;border-left:4px solid var(--red)"><div class="ct" style="color:var(--red)">&#x1F3C3; I miei atleti &mdash; <strong>'+myAsd+'</strong></div>'+summaryHtml+tableHtml+'</div>';
+  }
+  
+  var circBoxes=['ti','nord','cs','sic'].map(function(cid){
+    var c=CIR[cid],p=cp[cid];
+    var missingTxt=p.missing.length?p.missing.map(function(s){return s.name;}).join(', '):'Nessuna tappa mancante';
+    var missingColor=p.missing.length?'var(--tx2)':'var(--grn)';
+    return '<div class="card" style="border-left:3px solid '+c.color+';margin:0"><div style="font-family:var(--fh);font-weight:700;font-size:13px;color:'+c.color+';text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">'+c.name+'</div><div style="font-family:var(--fh);font-weight:800;font-size:24px;color:var(--tx);line-height:1">'+p.loaded+'<span style="font-size:14px;color:var(--tx3);font-weight:500">/'+p.total+'</span></div><div style="font-size:11px;color:var(--tx3);margin-top:2px">classifiche caricate</div><div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--brd)"><div style="font-size:10px;color:var(--tx3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px">Tappe mancanti</div><div style="font-size:11px;color:'+missingColor+';line-height:1.4">'+missingTxt+'</div></div></div>';
+  }).join('');
+  
+  el.innerHTML='<div style="margin-bottom:20px"><h1 style="font-family:var(--fh);font-weight:800;font-size:32px;letter-spacing:1px">CIRCUITO NAZIONALE <span style="color:var(--red)">NW STYLE 2027 · DEMO</span></h1><p style="color:var(--tx3);margin-top:4px;font-size:13px">'+(lastSaved?'Aggiornamento: '+fmtDT(lastSaved):'Nessun dato caricato')+'</p></div>'+
+    asdBoxHtml+
+    '<h3 style="font-family:var(--fh);font-weight:700;font-size:14px;letter-spacing:1px;color:var(--tx3);text-transform:uppercase;margin-bottom:10px">Panoramica circuiti</h3>'+
+    '<div class="g4">'+circBoxes+'</div>';
+}
+
+function openAtleta(key){
+  atState.query='';
+  var all=getAllAthletes();
+  var found=all.find(function(a){return a.key===key;});
+  if(found){
+    atState.selected=found;
+    goTab('atleta');
+  }
+}
+
+function quickUpload(sid){upState.stage=sid;goTab('upload');}
+
+// ═══════════════ INSERIMENTO MANUALE / EXCEL ═══════════════
+// Vista aggiuntiva: compila la classifica di tappa senza foto/OCR.
+// Fonte nomi: anagrafica dedotta dalle tappe Nord gia' in archivio (nomi canonici).
+// Dato autoritativo salvato = 'pos'; i punti circuito (100/95/... ×2 Jolly) restano
+// calcolati dal motore in lettura. In modalita' "Totale" la posizione e' automatica.
+var mnState={stage:'torino',cat:'',mode:'tot',rows:[]};
+
+function mnNordStages(){return STAGES.filter(function(s){return s.circuits.indexOf('nord')>=0&&s.id!=='san-dona';});}
+function mnStageJolly(){var st=STAGES.find(function(s){return s.id===mnState.stage;});return !!(st&&st.jollyFor.indexOf('nord')>=0);}
+function mnCircuitPts(pos){var p=vInt(pos);if(p===null||p<=0)return null;var base=isTappaItalia(mnState.stage)?posToPointsTI(p):posToPoints(p);return mnStageJolly()?base*2:base;}
+function mnIsCop(){var c=CATS.find(function(x){return x.id===mnState.cat;});return !!(c&&c.type==='cop');}
+
+// Anagrafica categoria: atleti/coppie visti nelle tappe Nord (esclusa la corrente), deduplicati per nome canonico.
+function mnRoster(catId){
+  var cat=CATS.find(function(c){return c.id===catId;});if(!cat)return [];
+  var isCop=cat.type==='cop';var seen={},out=[];var nord={};mnNordStages().forEach(function(s){nord[s.id]=1;});
+  Object.values(DB.results).forEach(function(res){
+    if(res.catId!==catId||!nord[res.stageId]||res.stageId===mnState.stage)return;
+    (res.rows||[]).forEach(function(r){
+      if(isCop){
+        var d=pairDisplay(r.p1,r.p2);if(!d||d.replace(/[\s/]/g,'')==='')return;
+        var k=d.toLowerCase();if(seen[k])return;seen[k]=1;
+        out.push({p1:canonPerson(r.p1||''),p2:canonPerson(r.p2||''),assoc:r.assoc||'',pos:'',tot:''});
+      }else{
+        var full=((r.cognome||'')+' '+(r.nome||'')).trim();if(!full)return;
+        var k=indKey(r.cognome,r.nome);if(!k||seen[k])return;seen[k]=1;
+        out.push({cognome:r.cognome||'',nome:r.nome||'',assoc:r.assoc||'',pos:'',tot:''});
+      }
+    });
+  });
+  out.sort(function(a,b){var na=(isCop?pairDisplay(a.p1,a.p2):((a.cognome||'')+' '+(a.nome||''))).toLowerCase();var nb=(isCop?pairDisplay(b.p1,b.p2):((b.cognome||'')+' '+(b.nome||''))).toLowerCase();return na<nb?-1:na>nb?1:0;});
+  return out;
+}
+
+// Righe di lavoro: se tappa+categoria ha gia' dati salvati parte da quelli (modifica), altrimenti dall'anagrafica.
+function mnLoadRows(){
+  var isCop=mnIsCop();var ex=getRes(mnState.stage,mnState.cat);
+  if(ex&&ex.rows&&ex.rows.length){
+    mnState.rows=ex.rows.map(function(r){
+      var t=(r.tot!==''&&r.tot!=null)?String(r.tot):'';
+      return isCop?{p1:r.p1||'',p2:r.p2||'',assoc:r.assoc||'',pos:r.pos!=null?String(r.pos):'',tot:t}
+                  :{cognome:r.cognome||'',nome:r.nome||'',assoc:r.assoc||'',pos:r.pos!=null?String(r.pos):'',tot:t};
+    });
+  }else{mnState.rows=mnRoster(mnState.cat);}
+}
+
+// Modalita' Totale: posizioni per totale decrescente (solo righe con totale).
+function mnComputePos(){
+  if(mnState.mode!=='tot')return;
+  mnState.rows.forEach(function(r){r.pos='';});
+  var idx=[];mnState.rows.forEach(function(r,i){if(vPts(r.tot)!==null)idx.push(i);});
+  idx.sort(function(a,b){var ta=vPts(mnState.rows[a].tot),tb=vPts(mnState.rows[b].tot);return tb!==ta?tb-ta:a-b;});
+  idx.forEach(function(i,rank){mnState.rows[i].pos=String(rank+1);});
+}
+
+function mnPresent(r){return mnState.mode==='tot'?vPts(r.tot)!==null:vInt(r.pos)!==null;}
+
+function mnValidate(){
+  var isCop=mnIsCop();var errs=[],warns=[];var names={},poss={},tots={};var present=0;
+  mnState.rows.forEach(function(r,i){
+    if(!mnPresent(r))return;present++;
+    var nm=isCop?pairDisplay(r.p1,r.p2):((r.cognome||'')+' '+(r.nome||'')).trim();
+    if(!nm||nm.replace(/[\s/]/g,'')==='')errs.push('Riga '+(i+1)+': nome mancante');
+    else{var kn=nm.toLowerCase();if(names[kn]!==undefined)errs.push('Nome duplicato: '+nm);else names[kn]=i;}
+    if(!String(r.assoc||'').trim())warns.push('ASD mancante ('+(nm||('riga '+(i+1)))+')');
+    if(mnState.mode==='pos'){
+      var p=vInt(r.pos);
+      if(p===null)errs.push('Posizione non valida a riga '+(i+1));
+      else{if(poss[p]!==undefined)errs.push('Posizione '+p+' assegnata due volte');else poss[p]=i;}
+    }else{
+      var t=vPts(r.tot);
+      if(t!==null){if(tots[t]!==undefined)warns.push('Pari merito sul totale '+t+' - ordine da decidere col giudice capo');tots[t]=i;}
+    }
+  });
+  if(present===0)errs.push('Nessun punteggio inserito');
+  if(mnState.mode==='pos'){
+    var ks=Object.keys(poss).map(Number).sort(function(a,b){return a-b;});
+    for(var j=0;j<ks.length;j++){if(ks[j]!==j+1){warns.push('Posizioni non consecutive (verifica intorno alla '+(j+1)+' posizione)');break;}}
+  }
+  return {errs:errs,warns:warns,present:present};
+}
+
+function renderManual(){
+  var el=document.getElementById('v-manuale');if(!el)return;
+  var stOpts=mnNordStages().map(function(s){return '<option value="'+s.id+'"'+(mnState.stage===s.id?' selected':'')+'>['+s.label+'] '+s.name+' &mdash; '+fmtDs(s.date)+(s.jollyFor.indexOf('nord')>=0?' &#x2B50; JOLLY':'')+'</option>';}).join('');
+  var catOpts='<option value="">-- seleziona --</option>'+CATS.map(function(c){return '<option value="'+c.id+'"'+(mnState.cat===c.id?' selected':'')+'>'+c.name+'</option>';}).join('');
+  var jolly=mnStageJolly();var stN=((STAGES.find(function(s){return s.id===mnState.stage;})||{}).name)||'';
+  var head='<div style="max-width:900px;margin:0 auto"><h2 style="font-family:var(--fh);font-weight:800;font-size:28px;margin-bottom:16px">INSERIMENTO <span style="color:var(--grn)">MANUALE / EXCEL</span></h2>'+
+    '<div class="al ai">&#x270D;&#xFE0F; Compila la classifica senza foto. Scegli <strong>una</strong> colonna guida: in <strong>Totale giudici</strong> la posizione &egrave; automatica; in <strong>Posizione</strong> il totale &egrave; facoltativo. I <strong>Punti circuito</strong> (100/95/&hellip;'+(jolly?' &times;2 Jolly':'')+') si calcolano da soli.</div>';
+  var pick='<div class="card" style="margin-bottom:16px"><div class="ct">1. Tappa, categoria e modalit&agrave;</div><div class="g2"><div class="fg"><label>Tappa</label><select onchange="mnSetStage(this.value)">'+stOpts+'</select></div><div class="fg"><label>Categoria</label><select onchange="mnSetCat(this.value)">'+catOpts+'</select></div></div>'+
+    '<div class="fg" style="margin-top:12px"><label>Colonna guida</label><div style="display:flex;gap:18px;flex-wrap:wrap"><label style="display:flex;align-items:center;gap:6px;font-weight:500;cursor:pointer"><input type="radio" name="mnmode" value="tot"'+(mnState.mode==='tot'?' checked':'')+' onchange="mnSetMode(\'tot\')"> Totale giudici &rarr; posizione automatica</label><label style="display:flex;align-items:center;gap:6px;font-weight:500;cursor:pointer"><input type="radio" name="mnmode" value="pos"'+(mnState.mode==='pos'?' checked':'')+' onchange="mnSetMode(\'pos\')"> Posizione (totale facoltativo)</label></div></div>'+
+    (jolly?'<div class="al aw" style="margin-top:12px;margin-bottom:0">&#x2B50; <strong>'+esc(stN)+' &egrave; tappa Jolly</strong>: i punti valgono &times;2. Il raddoppio &egrave; automatico nelle classifiche, non devi fare nulla.</div>':'')+'</div>';
+  var excel='<div class="card" style="margin-bottom:16px"><div class="ct">2. Excel (facoltativo)</div><div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center"><button class="btn bg bsm" onclick="mnExport()">&#x2B07;&#xFE0F; Scarica modello .xlsx</button><button class="btn bg bsm" onclick="document.getElementById(\'mn-file\').click()">&#x2B06;&#xFE0F; Carica modello compilato</button><input type="file" id="mn-file" accept=".xlsx,.xls" style="display:none" onchange="mnImport(this.files)"><span style="font-size:12px;color:var(--tx3)">Un foglio per categoria. Compila la colonna guida, poi ricarica qui per rivedere e salvare.</span></div></div>';
+  el.innerHTML=head+pick+excel+'<div id="mn-grid"></div></div>';
+  mnRenderGrid();
+}
+
+function mnRenderGrid(){
+  var g=document.getElementById('mn-grid');if(!g)return;
+  if(!mnState.cat){g.innerHTML='<div class="se">Seleziona una categoria per iniziare.</div>';return;}
+  mnComputePos();
+  var isCop=mnIsCop();var jolly=mnStageJolly();var v=mnValidate();
+  var st=STAGES.find(function(s){return s.id===mnState.stage;});var ct=CATS.find(function(c){return c.id===mnState.cat;});
+  var hdr=isCop?['POS','Partecipante 1','Partecipante 2','ASD','Tot. giudici','Punti'+(jolly?' &times;2':'')]:['POS','Cognome','Nome','ASD','Tot. giudici','Punti'+(jolly?' &times;2':'')];
+  var body=mnState.rows.map(function(r,i){
+    var pres=mnPresent(r);
+    var posCell=mnState.mode==='tot'?'<td style="text-align:center;font-weight:700">'+(r.pos||'<span style="color:var(--tx3)">&mdash;</span>')+'</td>':'<td><input class="ec" style="width:52px;text-align:center" inputmode="numeric" data-i="'+i+'" data-c="pos" value="'+esc(r.pos)+'" onchange="mnUpd(this)"></td>';
+    var nameCells=isCop?'<td><input class="ec" data-i="'+i+'" data-c="p1" value="'+esc(r.p1)+'" onchange="mnUpd(this)"></td><td><input class="ec" data-i="'+i+'" data-c="p2" value="'+esc(r.p2)+'" onchange="mnUpd(this)"></td>':'<td><input class="ec" data-i="'+i+'" data-c="cognome" value="'+esc(r.cognome)+'" onchange="mnUpd(this)"></td><td><input class="ec" data-i="'+i+'" data-c="nome" value="'+esc(r.nome)+'" onchange="mnUpd(this)"></td>';
+    var asdCell='<td><input class="ec" data-i="'+i+'" data-c="assoc" value="'+esc(r.assoc)+'" onchange="mnUpd(this)"></td>';
+    var totCell='<td><input class="ec" style="width:72px;text-align:center" inputmode="decimal" data-i="'+i+'" data-c="tot" value="'+esc(r.tot)+'" onchange="mnUpd(this)"></td>';
+    var cp=mnCircuitPts(r.pos);
+    var ptsCell='<td style="text-align:center;font-weight:700;color:'+(jolly?'var(--red2)':'var(--red)')+'">'+(cp!==null?cp+(jolly?'&#x2605;':''):'<span style="color:var(--tx3)">&mdash;</span>')+'</td>';
+    return '<tr'+(pres?'':' style="opacity:.5"')+'>'+posCell+nameCells+asdCell+totCell+ptsCell+'<td><span class="rd" onclick="mnDel('+i+')">&#x1F5D1;</span></td></tr>';
+  }).join('');
+  var alerts='';
+  if(v.errs.length)alerts+='<div class="al ae" style="margin-bottom:10px">&#x1F6D1; <strong>'+v.errs.length+' da correggere:</strong> '+v.errs.map(esc).join(' &middot; ')+'</div>';
+  if(v.warns.length)alerts+='<div class="al aw" style="margin-bottom:10px">&#x26A0;&#xFE0F; '+v.warns.map(esc).join(' &middot; ')+'</div>';
+  var saveBtn=v.errs.length?'<button class="btn bs2" disabled style="opacity:.5;cursor:not-allowed">Correggi gli errori per salvare</button>':(v.warns.length?'<button class="btn bp" style="background:var(--red)" onclick="mnSave()">&#x26A0;&#xFE0F; Salva comunque ('+v.present+')</button>':'<button class="btn bp" onclick="mnSave()">&#x2705; Salva classifica ('+v.present+')</button>');
+  var meta='<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px"><div style="font-family:var(--fh);font-weight:700">'+(ct?ct.name:'')+' &mdash; '+(st?st.name:'')+(jolly?' <span class="badge" style="background:rgba(230,51,41,.2);color:var(--red2)">JOLLY &times;2</span>':'')+'</div><div style="font-size:12px;color:var(--tx3)">'+v.present+' con punteggio &middot; '+mnState.rows.length+' in anagrafica</div></div>';
+  g.innerHTML='<div class="card">'+meta+alerts+'<div class="tw"><table><thead><tr>'+hdr.map(function(h){return '<th>'+h+'</th>';}).join('')+'<th></th></tr></thead><tbody>'+body+'</tbody></table></div><div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap"><button class="btn bg bsm" onclick="mnAdd()">+ Aggiungi '+(isCop?'coppia':'atleta')+'</button>'+saveBtn+'</div><p style="font-size:11px;color:var(--tx3);margin-top:8px">Righe in grigio = senza punteggio (non entrano in classifica). Si salva la posizione; i punti e il &times;2 Jolly restano calcolati in automatico.</p></div>';
+}
+
+function mnSetStage(v){mnState.stage=v;if(mnState.cat)mnLoadRows();renderManual();}
+function mnSetCat(v){mnState.cat=v;if(v)mnLoadRows();else mnState.rows=[];renderManual();}
+function mnSetMode(m){mnState.mode=m;mnRenderGrid();}
+function mnUpd(inp){var i=+inp.dataset.i,c=inp.dataset.c;if(i>=0&&i<mnState.rows.length)mnState.rows[i][c]=inp.value;mnRenderGrid();}
+function mnDel(i){mnState.rows.splice(i,1);mnRenderGrid();}
+function mnAdd(){mnState.rows.push(mnIsCop()?{p1:'',p2:'',assoc:'',pos:'',tot:''}:{cognome:'',nome:'',assoc:'',pos:'',tot:''});mnRenderGrid();}
+
+async function mnSave(){
+  var v=mnValidate();if(v.errs.length){mnRenderGrid();return;}
+  mnComputePos();
+  var isCop=mnIsCop();
+  var present=mnState.rows.filter(mnPresent);
+  var final=present.map(function(r){
+    var pos=vInt(r.pos);var t=vPts(r.tot);
+    var o=isCop?{p1:(r.p1||'').trim(),p2:(r.p2||'').trim()}:{cognome:(r.cognome||'').trim(),nome:(r.nome||'').trim()};
+    o.assoc=(r.assoc||'').trim();o.pos=pos;o.tot=(t!==null?t:'');o.pts=(t!==null?String(t):'');
+    return o;
+  });
+  final.sort(function(a,b){return (a.pos||9999)-(b.pos||9999);});
+  await saveRes(mnState.stage,mnState.cat,final);
+  var st=STAGES.find(function(s){return s.id===mnState.stage;});var ct=CATS.find(function(c){return c.id===mnState.cat;});
+  var g=document.getElementById('mn-grid');
+  if(g)g.innerHTML='<div class="al ao" style="margin-bottom:12px">&#x2705; <strong>Classifica salvata</strong>: '+final.length+' concorrenti &mdash; '+(ct?ct.name:'')+' &middot; '+(st?st.name:'')+'. I punti sono gi&agrave; nelle classifiche generali.</div><div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn bg bsm" onclick="goTab(\'classifiche\')">Vai alle classifiche</button><button class="btn bg bsm" onclick="renderManual()">Modifica ancora</button></div>';
+  if(activeTab==='dashboard')renderDash();
+}
+
+function mnExport(){
+  if(typeof XLSX==='undefined'){alert('Libreria Excel non disponibile.');return;}
+  var wb=XLSX.utils.book_new();
+  CATS.forEach(function(c){
+    var isCop=c.type==='cop';var ex=getRes(mnState.stage,c.id);
+    var src=(ex&&ex.rows&&ex.rows.length)?ex.rows.slice():mnRoster(c.id);
+    var head=isCop?['Pos','Partecipante 1','Partecipante 2','ASD','Tot giudici']:['Pos','Cognome','Nome','ASD','Tot giudici'];
+    var data=[head].concat(src.map(function(r){return isCop?[r.pos||'',r.p1||'',r.p2||'',r.assoc||'',r.tot||'']:[r.pos||'',r.cognome||'',r.nome||'',r.assoc||'',r.tot||''];}));
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(data),shName(c.short||c.name));
+  });
+  var st=STAGES.find(function(s){return s.id===mnState.stage;});
+  XLSX.writeFile(wb,'NWS2026_Modello_'+(((st&&st.name)||'tappa').replace(/\s+/g,''))+'.xlsx');
+}
+
+function mnImport(files){
+  if(!files||!files.length)return;
+  if(!mnState.cat){alert('Seleziona prima la categoria in cui importare.');return;}
+  if(typeof XLSX==='undefined'){alert('Libreria Excel non disponibile.');return;}
+  var cat=CATS.find(function(c){return c.id===mnState.cat;});var isCop=cat.type==='cop';
+  var fr=new FileReader();
+  fr.onload=function(e){
+    try{
+      var wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'});
+      var target=shName(cat.short||cat.name);
+      /* compatibilita' con i modelli Excel scaricati prima del cambio nomi (Istr.M, Camm.F...) */
+      if(wb.SheetNames.indexOf(target)<0&&cat.oldShort&&wb.SheetNames.indexOf(shName(cat.oldShort))>=0)target=shName(cat.oldShort);
+      var nm=wb.SheetNames.indexOf(target)>=0?target:(wb.SheetNames.filter(function(n){return n.toLowerCase().indexOf(String(cat.short||'').toLowerCase())>=0;})[0]||wb.SheetNames[0]);
+      var sh=wb.Sheets[nm];
+      var aoa=XLSX.utils.sheet_to_json(sh,{header:1,defval:''});
+      if(!aoa.length){alert('Foglio vuoto.');return;}
+      var hdr=aoa[0].map(function(x){return String(x).toLowerCase().trim();});
+      function col(cands){for(var k=0;k<hdr.length;k++){for(var m=0;m<cands.length;m++){if(hdr[k].indexOf(cands[m])>=0)return k;}}return -1;}
+      var cPos=col(['pos']),cAsd=col(['asd','assoc']),cTot=col(['tot']);
+      var c1=isCop?col(['partecipante 1','partecipante1','p1','coppia']):col(['cognome']);
+      var c2=isCop?col(['partecipante 2','partecipante2','p2']):col(['nome']);
+      var rows=[];
+      for(var i=1;i<aoa.length;i++){
+        var row=aoa[i];if(!row)continue;
+        var gv=function(idx){return idx>=0&&idx<row.length?String(row[idx]).trim():'';};
+        var n1=gv(c1),n2=gv(c2);
+        if(!n1&&!n2&&!gv(cTot)&&!gv(cPos))continue;
+        rows.push(isCop?{p1:n1,p2:n2,assoc:gv(cAsd),pos:gv(cPos),tot:gv(cTot)}:{cognome:n1,nome:n2,assoc:gv(cAsd),pos:gv(cPos),tot:gv(cTot)});
+      }
+      if(!rows.length){alert('Nessuna riga trovata nel foglio "'+nm+'".');return;}
+      mnState.rows=rows;
+      var hasTot=rows.some(function(r){return vPts(r.tot)!==null;});
+      var hasPos=rows.some(function(r){return vInt(r.pos)!==null;});
+      mnState.mode=(hasTot&&!hasPos)?'tot':((hasPos&&!hasTot)?'pos':mnState.mode);
+      renderManual();
+    }catch(err){alert('Errore lettura file: '+err.message);}
+  };
+  fr.readAsArrayBuffer(files[0]);
+}
+// ═══════════════ FINE INSERIMENTO MANUALE / EXCEL ═══════════════
+
+
+function renderUpload(){
+  var el=document.getElementById('v-upload');
+  var stOpts=STAGES.filter(function(s){return s.id!=='san-dona';}).map(function(s){
+    var cid=s.circuits.indexOf('ti')>=0?'ti':s.circuits[0];
+    return '<option value="'+s.id+'"'+(upState.stage===s.id?' selected':'')+'>['+s.label+'] '+s.name+' &mdash; '+fmtDs(s.date)+'</option>';
+  }).join('');
+  var catOpts=CATS.map(function(c){return '<option value="'+c.id+'"'+(upState.cat===c.id?' selected':'')+'>'+c.name+'</option>';}).join('');
+  el.innerHTML='<div style="max-width:700px;margin:0 auto"><h2 style="font-family:var(--fh);font-weight:800;font-size:28px;margin-bottom:20px">CARICA <span style="color:var(--ti)">RISULTATI TAPPA</span></h2><div class="al ai">&#x1F916; OCR via Gemini con <strong>doppia lettura</strong> &mdash; puoi caricare pi&#xF9; immagini per la stessa categoria (es. classifica su pi&#xF9; pagine).</div><div class="card" style="margin-bottom:16px"><div class="ct">1. Seleziona tappa e categoria</div><div class="g2"><div class="fg"><label>Tappa</label><select id="sel-stage" onchange="upState.stage=this.value;chkExist()"><option value="">-- seleziona --</option>'+stOpts+'</select></div><div class="fg"><label>Categoria</label><select id="sel-cat" onchange="upState.cat=this.value;chkExist()"><option value="">-- seleziona --</option>'+catOpts+'</select></div></div><div id="ex-warn"></div></div><div class="card"><div class="ct">2. Carica immagini classifica</div><div class="uz" id="uz" onclick="document.getElementById(\'fi\').click()" ondragover="event.preventDefault();this.classList.add(\'dv\')" ondragleave="this.classList.remove(\'dv\')" ondrop="handleDropMulti(event)"><input type="file" id="fi" accept="image/*" multiple onchange="handleFiles(this.files)"><div style="font-size:40px;margin-bottom:12px">&#x1F4F8;</div><p style="color:var(--tx2)">Trascina una o pi&#xF9; immagini JPG oppure <strong style="color:var(--red)">clicca per selezionare</strong></p><p style="font-size:12px;color:var(--tx3);margin-top:6px">Seleziona pi&#xF9; file contemporaneamente se la classifica &#xE8; su pi&#xF9; pagine</p></div><div id="up-preview" style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap"></div><div id="ocr-status" style="margin-top:16px"></div></div></div>';
+  chkExist();
+}
+
+function chkExist(){
+  var sid=document.getElementById('sel-stage')?document.getElementById('sel-stage').value:'';
+  var cid=document.getElementById('sel-cat')?document.getElementById('sel-cat').value:'';
+  var w=document.getElementById('ex-warn');
+  if(!w)return;
+  w.innerHTML=(sid&&cid&&hasRes(sid,cid))
+    ?'<div class="al aw" style="margin-top:12px;margin-bottom:0">&#x26A0;&#xFE0F; Dato gi&agrave; presente &mdash; il caricamento sovrascriver&agrave; i dati esistenti.</div>':'';
+}
+
+function handleDropMulti(e){e.preventDefault();document.getElementById('uz').classList.remove('dv');if(e.dataTransfer.files.length)handleFiles(e.dataTransfer.files);}
+
+function handleFiles(files){
+  if(!files||!files.length)return;
+  var sid=document.getElementById('sel-stage').value;
+  var cid=document.getElementById('sel-cat').value;
+  if(!sid||!cid){document.getElementById('ocr-status').innerHTML='<div class="al ae">&#x274C; Seleziona prima tappa e categoria.</div>';return;}
+  
+  var fileArr=Array.from(files);
+  var preview=document.getElementById('up-preview');
+  preview.innerHTML='';
+  
+  fileArr.forEach(function(file,i){
+    var reader=new FileReader();
+    reader.onload=function(e){
+      preview.innerHTML+='<div style="text-align:center"><img src="'+e.target.result+'" style="height:120px;border-radius:6px;border:1px solid var(--brd)"><div style="font-size:11px;color:var(--tx3);margin-top:4px">Pag. '+(i+1)+'</div></div>';
+    };
+    reader.readAsDataURL(file);
+  });
+  
+  runOCRMulti(fileArr, sid, cid);
+}
+
+async function runOCRMulti(files, stageId, catId){
+  var status=document.getElementById('ocr-status');
+  var cat=CATS.find(function(c){return c.id===catId;});
+  var isCop=cat.type==='cop';
+  var allRows=[], allRows2=[], gotB=false;
+  
+  status.innerHTML='<div class="sl"><div class="spin"></div><p style="margin-top:12px;color:var(--tx2)">OCR in corso per '+files.length+' immagine'+(files.length>1?'i':'')+'...</p><p style="font-size:12px;color:var(--tx3);margin-top:4px" id="ocr-page-status">Pagina 1 di '+files.length+'</p></div>';
+  
+  for(var i=0;i<files.length;i++){
+    var pageStatus=document.getElementById('ocr-page-status');
+    if(pageStatus) pageStatus.textContent='Pagina '+(i+1)+' di '+files.length;
+    
+    var b64=await fileToBase64(files[i]);
+    try{
+      var res=await ocrRequest(b64, isCop, files[i].type);
+      res.rows.forEach(function(r){
+        var exists=allRows.find(function(x){return String(x.pos)===String(r.pos);});
+        if(!exists) allRows.push(r);
+      });
+      if(res.rows2 && res.rows2.length){
+        gotB=true;
+        res.rows2.forEach(function(r){
+          var exists=allRows2.find(function(x){return String(x.pos)===String(r.pos);});
+          if(!exists) allRows2.push(r);
+        });
+      }
+    }catch(e){
+      console.error('OCR page '+(i+1)+' error:',e);
+    }
+  }
+  
+  allRows.sort(function(a,b){return (a.pos||0)-(b.pos||0);});
+  allRows2.sort(function(a,b){return (a.pos||0)-(b.pos||0);});
+  
+  if(!allRows.length){
+    status.innerHTML='<div class="al ae">&#x274C; Nessuna riga trovata in nessuna immagine</div>';
+    return;
+  }
+  
+  var merged;
+  if(gotB){ merged=alignReadings(allRows,allRows2,isCop); }
+  else { resetCmp(); merged=allRows; }
+  var modo = !gotB ? ' <strong>(lettura singola)</strong>'
+           : _bDropped ? ' <strong>(seconda lettura scartata: troppo diversa)</strong>'
+           : ' con doppia lettura';
+  status.innerHTML='<div class="al ao">&#x2705; '+merged.length+' righe estratte da '+files.length+' immagine'+(files.length>1?'i':'')+modo+'. <strong>Controlla</strong> prima di confermare.</div>';
+  showModal(merged, stageId, catId);
+}
+
+function fileToBase64(file){
+  return new Promise(function(resolve,reject){
+    var reader=new FileReader();
+    reader.onload=function(e){resolve(e.target.result.split(',')[1]);};
+    reader.onerror=reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+async function ocrRequest(b64, isCop, mime){
+  var resp=await fetch('https://oykewinjysrgnhdpkabs.supabase.co/functions/v1/gemini-ocr',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({image:b64,isCoppia:isCop,mime:mime||'image/jpeg'})
+  });
+  var data=await resp.json();
+  if(data.error) throw new Error(data.error);
+  if(data.errB) console.warn('Lettura B non disponibile:', data.errB);
+  return {rows:data.rows||[], rows2:data.rows2||null};
+}
+
+var ASD_KW=['ASD','NW','NORDIC','WALKING','SPORT','CAMMINO','SORRISI','AQUILE','OMNIA','ETNA','KINESIS','EVOLUZIONE','TEAM','TRIESTE','ATLETICA','MONTELLO','PIAVE','BASILICATA','MARCHE','RAGUSA','SICILIA','GORIZIA','POMEZIA','MOGLIANO','RUNNERS','FRIENDS','BENESSERE','EQUIPE','ROMACAMMINA'];
+
+function parseLines(lines,isCop){
+  var rows=[];
+  for(var li=0;li<lines.length;li++){
+    var line=lines[li];
+    var words=(line.words||[]).filter(function(w){return (w.confidence||0)>25;}).map(function(w){return w.text.trim().replace(/[|{}\[\]]/g,'').trim();}).filter(Boolean);
+    if(words.length<4)continue;
+    var posStr=words[0].replace(/[^0-9]/g,'');
+    var pos=parseInt(posStr);
+    if(isNaN(pos)||pos<1||pos>300)continue;
+    var ptsIdx=-1,ptsStr='';
+    for(var i=words.length-1;i>=2;i--){
+      var t=words[i].replace(/[^0-9,.]/g,'');
+      if(/\d{3,}[,.]\d{3,}/.test(t)||/\d{2,}[,.]\d{4,}/.test(t)){ptsStr=words[i];ptsIdx=i;break;}
+    }
+    if(ptsIdx<0){ptsStr=words[words.length-1];ptsIdx=words.length-1;}
+    var totIdx=-1,totStr='';
+    for(var j=ptsIdx-1;j>=1;j--){
+      var tj=words[j].replace(/[^0-9]/g,'');
+      if(/^\d{2,3}$/.test(tj)){totStr=tj;totIdx=j;break;}
+    }
+    if(totIdx<0){totIdx=ptsIdx-1;totStr=words[ptsIdx-1]||'';}
+    var mid=words.slice(1,totIdx>0?totIdx:ptsIdx);
+    var tot=parseInt(totStr)||0;
+    var assocStart=mid.length;
+    for(var k=0;k<mid.length;k++){
+      var up=mid[k].toUpperCase();
+      var found=false;
+      for(var ki=0;ki<ASD_KW.length;ki++){if(up.indexOf(ASD_KW[ki])>=0){found=true;break;}}
+      if(found){assocStart=k;break;}
+    }
+    if(assocStart===mid.length&&mid.length>(isCop?6:3)){assocStart=isCop?Math.max(4,mid.length-3):Math.max(2,mid.length-2);}
+    var namePart=mid.slice(0,assocStart);
+    var assoc=mid.slice(assocStart).join(' ');
+    if(isCop){var h=Math.ceil(namePart.length/2);rows.push({pos:pos,p1:namePart.slice(0,h).join(' '),p2:namePart.slice(h).join(' '),assoc:assoc,tot:tot,pts:ptsStr});}
+    else{rows.push({pos:pos,cognome:namePart[0]||'',nome:namePart.slice(1).join(' '),assoc:assoc,tot:tot,pts:ptsStr});}
+  }
+  return rows;
+}
+
+var _rows=[],_stg='',_cat='';
+
+/* ===== VALIDAZIONE OCR =====
+   Controlli deterministici sulle righe prima del salvataggio.
+   Regola cardine: la parte intera di "pts" deve coincidere con "tot". */
+function vInt(v){var s=String(v==null?'':v).trim();return /^\d+$/.test(s)?parseInt(s,10):null;}
+function vPts(v){var s=String(v==null?'':v).trim().replace(/\s/g,'').replace(',','.');return /^\d+(\.\d+)?$/.test(s)?parseFloat(s):null;}
+function fmtN(n){return String(n).replace('.',',');}
+function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function chkRow(r){var t=vInt(r.tot),p=vPts(r.pts);return t!==null&&p!==null&&Math.floor(p)===t;}
+
+function validateRows(rows,isCop){
+  var errs={};
+  function add(i,c,msg){var k=i+':'+c;if(!errs[k])errs[k]=[];errs[k].push(msg);}
+  var prevPts=null;
+  rows.forEach(function(r,i){
+    var pos=vInt(r.pos), tot=vInt(r.tot), pts=vPts(r.pts);
+    if(pos===null)add(i,'pos','Posizione non numerica');
+    if(tot===null)add(i,'tot','Tot. Giudici non numerico');
+    if(pts===null)add(i,'pts','Punti non numerici');
+    if(tot!==null&&pts!==null&&Math.floor(pts)!==tot){
+      add(i,'tot','Non coincide con la parte intera dei Punti ('+Math.floor(pts)+')');
+      add(i,'pts','Parte intera '+Math.floor(pts)+' diversa dal Tot. Giudici '+tot);
+    }
+    if(pos!==null&&pos!==i+1)add(i,'pos','Attesa posizione '+(i+1)+', trovata '+pos+' - riga saltata?');
+    if(pts!==null){
+      if(prevPts!==null&&pts>prevPts)add(i,'pts','Punti superiori alla riga precedente ('+fmtN(prevPts)+')');
+      prevPts=pts;
+    }
+    if(isCop){
+      if(!String(r.p1||'').trim())add(i,'p1','Nome mancante');
+      if(!String(r.p2||'').trim())add(i,'p2','Nome mancante');
+    }else{
+      if(!String(r.cognome||'').trim())add(i,'cognome','Cognome mancante');
+      if(!String(r.nome||'').trim())add(i,'nome','Nome mancante');
+    }
+    if(!String(r.assoc||'').trim())add(i,'assoc','Associazione mancante');
+  });
+  var seen={};
+  rows.forEach(function(r,i){
+    var n=(isCop?pairDisplay(r.p1,r.p2):((r.cognome||'')+' '+(r.nome||'')).trim()).toLowerCase();
+    if(!n)return;
+    if(seen[n]!==undefined)add(i,isCop?'p1':'cognome','Duplicato della riga '+(seen[n]+1));
+    else seen[n]=i;
+  });
+  var keys=Object.keys(errs), rr={};
+  keys.forEach(function(k){rr[k.split(':')[0]]=true;});
+  return {errs:errs,count:keys.length,rows:Object.keys(rr).length};
+}
+
+/* ===== DOPPIA LETTURA =====
+   _conf["i:col"] = {a, b, hint}   hint = 'A' | 'B' | null
+   hint indica quale lettura il controllo Punti/Totale ritiene corretta.
+   E' SOLO un suggerimento: il valore viene preselezionato ma la cella
+   resta segnalata e conteggiata, la verifica finale resta all'utente. */
+var _conf={};
+var _only={};
+var _bDropped=false;
+var _cmpDone=false;  /* true SOLO se il confronto fra le due letture e' avvenuto davvero */
+
+function sameVal(x,y,numeric){
+  var sx=String(x==null?'':x).trim(), sy=String(y==null?'':y).trim();
+  if(numeric){
+    var nx=parseFloat(sx.replace(',','.')), ny=parseFloat(sy.replace(',','.'));
+    if(!isNaN(nx)&&!isNaN(ny))return nx===ny;
+  }
+  return sx.toLowerCase().replace(/\s+/g,' ')===sy.toLowerCase().replace(/\s+/g,' ');
+}
+
+function resetCmp(){_conf={};_only={};_bDropped=false;_cmpDone=false;}
+
+function alignReadings(A,B,isCop){
+  resetCmp();
+  A=A||[];
+  if(!B||!B.length)return A.slice();
+
+  /* CANCELLO DI SICUREZZA
+     Se B differisce troppo dalla A e' probabilmente una lettura sballata:
+     usarla introdurrebbe righe fantasma invece di trovare errori.
+     Meglio rinunciare al confronto che peggiorare il dato. */
+  if(Math.abs(A.length-B.length) > Math.max(3, Math.round(A.length*0.25))){
+    _bDropped=true;
+    return A.slice();
+  }
+  _cmpDone=true;
+
+  var cols=isCop?['pos','p1','p2','assoc','tot','pts']:['pos','cognome','nome','assoc','tot','pts'];
+  var mapA={},mapB={},poss={};
+  A.forEach(function(r){var p=vInt(r.pos);if(p!==null&&mapA[p]===undefined){mapA[p]=r;poss[p]=1;}});
+  B.forEach(function(r){var p=vInt(r.pos);if(p!==null&&mapB[p]===undefined){mapB[p]=r;poss[p]=1;}});
+
+  var ordered=Object.keys(poss).map(Number).sort(function(x,y){return x-y;});
+  var out=[];
+
+  ordered.forEach(function(p){
+    var a=mapA[p], b=mapB[p], i=out.length;
+    if(a&&!b){out.push(JSON.parse(JSON.stringify(a)));_only[i]='A';return;}
+    if(b&&!a){out.push(JSON.parse(JSON.stringify(b)));_only[i]='B';return;}
+
+    var m=JSON.parse(JSON.stringify(a));
+    var dTot=!sameVal(a.tot,b.tot,true), dPts=!sameVal(a.pts,b.pts,true);
+
+    if(dTot||dPts){
+      var okA=chkRow(a), okB=chkRow(b);
+      var hint = (okA&&!okB) ? 'A' : ((okB&&!okA) ? 'B' : null);
+      if(hint==='B'){ m.tot=b.tot; m.pts=b.pts; }
+      if(dTot)_conf[i+':tot']={a:a.tot,b:b.tot,hint:hint};
+      if(dPts)_conf[i+':pts']={a:a.pts,b:b.pts,hint:hint};
+    }
+    cols.forEach(function(c){
+      if(c==='tot'||c==='pts')return;
+      if(!sameVal(a[c],b[c],false))_conf[i+':'+c]={a:a[c],b:b[c],hint:null};
+    });
+    out.push(m);
+  });
+  return out;
+}
+
+function useAlt(i,c){
+  var cf=_conf[i+':'+c]; if(!cf)return;
+  var cur=String(_rows[i][c]==null?'':_rows[i][c]);
+  _rows[i][c]=sameVal(cur,cf.a,false)?cf.b:cf.a;
+  renderRev();
+}
+
+function cmpCounts(){
+  var keys=Object.keys(_conf), hinted=0;
+  keys.forEach(function(k){if(_conf[k].hint)hinted++;});
+  return {conf:keys.length, hinted:hinted, only:Object.keys(_only).length};
+}
+
+function renderRev(){
+  var cat=CATS.find(function(c){return c.id===_cat;});
+  var isCop=cat.type==='cop';
+  var val=validateRows(_rows,isCop);
+  var cc=cmpCounts();
+  document.getElementById('mbody').innerHTML=buildRevTable(_rows,isCop,val);
+  /* TUTTE le discrepanze entrano nel conteggio, anche quelle con suggerimento */
+  var pend=val.count+cc.conf+cc.only;
+  document.getElementById('mfoot').innerHTML=
+    '<button class="btn bs2" onclick="closeModal()">Annulla</button>'+
+    (pend>0
+      ? '<button class="btn bp" style="background:var(--red)" onclick="confirmSave()">&#x26A0;&#xFE0F; Salva comunque ('+pend+' da verificare)</button>'
+      : '<button class="btn bp" onclick="confirmSave()">&#x2705; Conferma e Salva</button>');
+}
+
+function updCell(inp){
+  var i=+inp.dataset.row,c=inp.dataset.col;
+  if(i>=0&&i<_rows.length)_rows[i][c]=inp.value;
+  renderRev();
+}
+
+
+function showModal(rows,stageId,catId){
+  _rows=JSON.parse(JSON.stringify(rows));_stg=stageId;_cat=catId;
+  var stage=STAGES.find(function(s){return s.id===stageId;});
+  var cat=CATS.find(function(c){return c.id===catId;});
+  document.getElementById('mt').textContent='Revisione: '+stage.name+' \u2013 '+cat.name;
+  renderRev();
+  document.getElementById('mo').classList.add('open');
+}
+
+function buildRevTable(rows,isCop,val){
+  val=val||validateRows(rows,isCop);
+  var cols=isCop?['pos','p1','p2','assoc','tot','pts']:['pos','cognome','nome','assoc','tot','pts'];
+  var hdrs=isCop?['POS','Partecipante 1','Partecipante 2','Associazione','Tot. Giudici','Punti']:['POS','Cognome','Nome','Associazione','Tot. Giudici','Punti'];
+  var anomalies=rows.map(function(r){
+    var name=isCop?pairDisplay(r.p1,r.p2):((r.cognome||'')+' '+(r.nome||'')).trim();
+    if(!name)return null;
+    return findSimilarName(name, _cat);
+  });
+  var anomCount=anomalies.filter(function(a){return a;}).length;
+  var cc=cmpCounts();
+  var html='<p style="color:var(--tx2);font-size:12px;margin-bottom:12px">Clicca su qualsiasi cella per modificarla prima di salvare.</p>';
+  if(_bDropped){
+    html+='<div class="al aw" style="margin-bottom:12px">&#x26A0;&#xFE0F; <strong>Seconda lettura scartata</strong>: il numero di righe era troppo diverso dalla prima. Nessun confronto disponibile, resta attivo il solo controllo aritmetico.</div>';
+  }
+  if(val.count>0){
+    html+='<div class="al ae" style="margin-bottom:12px">&#x1F6D1; <strong>'+val.count+' controllo'+(val.count>1?'i':'')+' non superat'+(val.count>1?'i':'o')+'</strong> su '+val.rows+' riga'+(val.rows>1?'he':'')+'. Celle in rosso: passa il mouse per il motivo.</div>';
+  }
+  if(_cmpDone && cc.conf===0 && cc.only===0){
+    html+='<div class="al ao" style="margin-bottom:12px">&#x2705; <strong>Doppia lettura: i due modelli concordano</strong> su tutte le '+rows.length+' righe. Nessuna discordanza da verificare.</div>';
+  }
+  if(cc.conf>0||cc.only>0){
+    html+='<div class="al aw" style="margin-bottom:12px">&#x1F50D; <strong>Le due letture differiscono</strong> su '+cc.conf+' cell'+(cc.conf===1?'a':'e')+
+      (cc.only>0?' e su '+cc.only+' riga'+(cc.only>1?'he':'')+' presente in una sola lettura':'')+'. '+
+      (cc.hinted>0?'Per '+cc.hinted+' il controllo Punti/Totale indica quale sia corretta e l\'ha gi&#xE0; preselezionata (&#x2714;) &mdash; <strong>verificale comunque</strong>. ':'')+
+      'Clicca il valore giallo accanto alla cella per usare l\'altra lettura.</div>';
+  }
+  if(anomCount>0){
+    html+='<div class="al" style="background:#fff7e6;border:1px solid #fbbf24;color:#92400e;margin-bottom:12px">&#x26A0;&#xFE0F; <strong>'+anomCount+' nome'+(anomCount>1?'i':'')+' simile'+(anomCount>1?'i':'')+'</strong> a voci gi&#xE0; presenti. Verifica per evitare duplicati.</div>';
+  }
+  html+='<div class="tw"><table><thead><tr>'+hdrs.map(function(h){return '<th>'+h+'</th>';}).join('')+'<th></th></tr></thead><tbody>';
+  rows.forEach(function(r,i){
+    var anom=anomalies[i];
+    var rowStyle=_only[i]?' style="background:#fde68a"':(anom?' style="background:#fff7e6"':'');
+    html+='<tr'+rowStyle+'>'+cols.map(function(c,j){
+      var warn='';
+      if(anom&&((isCop&&(c==='p1'||c==='p2'))||(!isCop&&(c==='cognome'||c==='nome')))){
+        if((isCop&&c==='p1')||(!isCop&&c==='cognome')){
+          warn=' <span title="Simile a: '+esc(anom.similar)+' ('+Math.round(anom.score*100)+'%)" style="color:#f59e0b;cursor:help">&#x26A0;&#xFE0F;</span>';
+        }
+      }
+      var k=i+':'+c;
+      var ce=val.errs[k], cf=_conf[k];
+      var cls='ec'+(ce?' err':'')+(cf?' cfl':'');
+      var tip='', extra='';
+      if(ce){ tip=ce.join(' - '); }
+      else if(cf){
+        tip='Lettura A: '+cf.a+'   |   Lettura B: '+cf.b+
+            (cf.hint?('   >>> il controllo Punti/Totale indica la lettura '+cf.hint+', gia preselezionata - verifica')
+                    :'   >>> il controllo non sa quale sia corretta');
+      }
+      if(cf){
+        var other=sameVal(r[c],cf.a,false)?cf.b:cf.a;
+        extra=' <span class="alt" onclick="useAlt('+i+',\''+c+'\')" title="Usa l&apos;altra lettura">'+esc(other)+'</span>';
+        if(cf.hint)extra+='<span class="okr" title="Valore preselezionato dal controllo Punti/Totale">&#x2714;</span>';
+      }
+      return '<td><input class="'+cls+'"'+(tip?' title="'+esc(tip)+'"':'')+' style="'+(j===0||j===4?'width:50px':j===5?'width:110px':'')+'" data-row="'+i+'" data-col="'+c+'" value="'+esc(r[c])+'" onchange="updCell(this)">'+warn+extra+'</td>';
+    }).join('')+'<td><span class="rd" onclick="delRow('+i+')">&#x1F5D1;</span></td></tr>';
+  });
+  html+='</tbody></table></div><button class="btn bg bsm" style="margin-top:12px" onclick="addRow()">+ Aggiungi riga</button>';
+  return html;
+}
+
+function delRow(i){_rows.splice(i,1);resetCmp();renderRev();}
+function addRow(){var cat=CATS.find(function(c){return c.id===_cat;});var isCop=cat.type==='cop';_rows.push(isCop?{pos:_rows.length+1,p1:'',p2:'',assoc:'',tot:0,pts:'0'}:{pos:_rows.length+1,cognome:'',nome:'',assoc:'',tot:0,pts:'0'});resetCmp();renderRev();}
+
+async function confirmSave(){
+  document.querySelectorAll('#mbody input.ec').forEach(function(inp){var i=+inp.dataset.row,c=inp.dataset.col;if(i>=0&&i<_rows.length)_rows[i][c]=inp.value;});
+  await saveRes(_stg,_cat,_rows);
+  closeModal();
+  var s=document.getElementById('ocr-status');
+  var st=STAGES.find(function(x){return x.id===_stg;});
+  var ct=CATS.find(function(x){return x.id===_cat;});
+  if(s)s.innerHTML='<div class="al ao">&#x2705; Salvati '+_rows.length+' risultati per '+(st?st.name:'')+' &ndash; '+(ct?ct.name:'')+'</div>';
+  if(activeTab==='dashboard')renderDash();
+}
+
+function closeModal(){document.getElementById('mo').classList.remove('open');}
+
+
+function buildASDClassContent(cirId){
+  var t=asdCircTable(cirId);
+  var natRows=getASDNationalStandings();
+  var stickA='position:sticky;left:0;z-index:1;background:var(--s1)';
+  function asdCell(r){
+    var hl=isASD(r.asd);
+    return '<td style="'+stickA+';min-width:170px;font-weight:'+(hl?600:400)+';color:'+(hl?'var(--red)':'var(--tx)')+'">'+r.asd+'</td>';
+  }
+  var circHtml='';
+  if(!t.data.length){
+    circHtml='<div class="se">Nessun dato per '+CIR[cirId].name+'</div>';
+  } else {
+    var th='<th>POS</th><th style="'+stickA.replace('var(--s1)','var(--s2)')+'">ASD</th>'+
+      t.stgs.map(function(s){return '<th style="text-align:right;white-space:nowrap">'+asdStageLabel(s,cirId)+'</th>';}).join('')+
+      '<th style="text-align:right">TOTALE</th>';
+    var body=t.data.map(function(d,i){
+      var r=d.r;
+      var cells=d.cells.map(function(c){
+        if(!c)return '<td style="text-align:right;color:var(--tx3)">&ndash;</td>';
+        if(c.missing)return '<td style="text-align:right;color:var(--red);white-space:nowrap" title="0 punti: '+c.missing+' (regolamento punto 26)">0 &#x26A0;&#xFE0F;<div style="font-size:10px;color:var(--tx3)">'+c.missing.replace('istruttore','istr.').replace('camminatore','camm.')+'</div></td>';
+        return '<td style="text-align:right">'+c.pts+'</td>';
+      }).join('');
+      return '<tr class="'+(isASD(r.asd)?'hl':'')+'">'+
+        '<td><span class="pb p'+(i<3?i+1:'x')+'">'+(i+1)+'</span></td>'+asdCell(r)+cells+
+        '<td class="pts" style="text-align:right;color:var(--red)">'+r.total+'</td>'+
+        '</tr>';
+    }).join('');
+    circHtml='<div class="tw"><table><thead><tr>'+th+'</tr></thead><tbody>'+body+'</tbody></table></div>'+
+      '<p style="font-size:11px;color:var(--tx3);margin-top:8px">Per tappa: miglior atleta per cat. = punti posizione; altri: 10 pt (top 10), 5 pt (11°+). Jolly (J×2): totale tappa ×2. Solo categorie individuali. Si sommano <strong>tutte le tappe</strong> del circuito (Tappa Italia inclusa). <strong>0 &#x26A0;&#xFE0F;</strong> = tappa a zero perch&eacute; l\'ASD non aveva almeno un istruttore e un camminatore (punto 26), sotto lo zero il motivo. &ndash; = ASD assente o tappa non caricata.</p>';
+  }
+
+  var natHtml='';
+  if(natRows.length){
+    var natBody=natRows.map(function(r,i){
+      var b3='';
+      for(var k=0;k<3;k++){
+        var b=r.best3[k];
+        b3+=b?'<td style="text-align:right;white-space:nowrap"><strong>'+b.pts+'</strong><div style="font-size:10px;color:var(--tx3)">'+stageName(b.stageId)+'</div></td>':'<td style="text-align:right;color:var(--tx3)">&ndash;</td>';
+      }
+      var tiC=!r.tiSt?'<td style="text-align:right;color:var(--tx3)">&ndash;</td>':
+        (r.tiSt.missing?'<td style="text-align:right;color:var(--red);white-space:nowrap" title="0 punti: '+r.tiSt.missing+'">0 &#x26A0;&#xFE0F;<div style="font-size:10px;color:var(--tx3)">'+r.tiSt.missing.replace('istruttore','istr.').replace('camminatore','camm.')+'</div></td>':'<td style="text-align:right">'+r.ti+'</td>');
+      var finC=r.hasFin?'<td style="text-align:right">'+r.fin+'</td>':'<td style="text-align:right;color:var(--tx3)">&ndash;</td>';
+      return '<tr class="'+(isASD(r.asd)?'hl':'')+'">'+
+        '<td><span class="pb p'+(i<3?i+1:'x')+'">'+(i+1)+'</span></td>'+asdCell(r)+
+        b3+tiC+finC+
+        '<td class="pts" style="text-align:right;color:var(--cs)">'+r.total+'</td>'+
+        '</tr>';
+    }).join('');
+    natHtml='<div class="expblk" data-exp="Nazionale" style="margin-top:20px"><div style="font-family:var(--fh);font-weight:700;font-size:16px;margin-bottom:10px">&#x1F30D; Classifica Nazionale a Squadre</div>'+
+      '<div class="tw"><table><thead><tr><th>POS</th><th style="'+stickA.replace('var(--s1)','var(--s2)')+'">ASD</th><th style="text-align:right">1ª TAPPA</th><th style="text-align:right">2ª TAPPA</th><th style="text-align:right">3ª TAPPA</th><th style="text-align:right">T. ITALIA</th><th style="text-align:right">FINALISSIMA</th><th style="text-align:right">TOTALE</th></tr></thead><tbody>'+natBody+'</tbody></table></div>'+
+      '<p style="font-size:11px;color:var(--tx3);margin-top:8px">Per ogni ASD: le <strong>3 migliori tappe</strong> del proprio circuito (sotto il punteggio il nome della tappa) + Tappa Italia + Finalissima. Stesse regole di punteggio della classifica di circuito, tappa a 0 senza almeno un istruttore e un camminatore.</p></div>';
+  }
+
+  return '<div class="expblk" data-exp="Circuito"><div style="font-family:var(--fh);font-weight:700;font-size:16px;margin-bottom:10px">&#x1F3C6; Classifica ASD &ndash; '+CIR[cirId].name+'</div>'+circHtml+'</div>'+natHtml;
+}
+
+function renderClass(){
+  var el=document.getElementById('v-classifiche');
+  var cir=clState.circuit,cat=clState.cat;
+  var cirBtns=['ti','nord','cs','sic'].map(function(c){return '<button class="tb'+(cir===c?' active':'')+'" style="'+(cir===c?'border-color:'+CIR[c].color+';color:'+CIR[c].color:'')+'" onclick="clState.circuit=\''+c+'\';renderClass()">'+CIR[c].name+'</button>';}).join('');
+  var catBtns=CATS.map(function(c){return '<button class="tb'+(cat===c.id?' active':'')+'" style="'+(cat===c.id?'border-color:'+CIR[cir].color+';color:'+CIR[cir].color:'')+'" onclick="clState.cat=\''+c.id+'\';clState.showASD=false;renderClass()">'+c.name+'</button>';}).join('');
+  catBtns+='<button class="tb'+(clState.showASD?' active':'')+'" style="'+(clState.showASD?'border-color:var(--red);color:var(--red)':'')+'" onclick="clState.showASD=true;renderClass()">&#x1F3C6; Classifica ASD</button>';
+  var mainContent='';
+  if(clState.showASD){
+    mainContent=expBar()+'<div class="card" id="exp-wrap">'+buildASDClassContent(cir)+'</div>';
+  } else {
+    mainContent=expBar()+'<div class="card" id="exp-wrap">'+buildStTable(cir,cat)+'</div><div style="margin-top:20px">'+buildStageDetail(cir,cat)+'</div>';
+  }
+  el.innerHTML='<h2 style="font-family:var(--fh);font-weight:800;font-size:28px;margin-bottom:16px">CLASSIFICHE <span style="color:var(--red)">CIRCUITO</span></h2><div class="tg">'+cirBtns+'</div><div class="tg">'+catBtns+'</div>'+mainContent;
+}
+
+function buildStTable(cirId,catId){
+  var c=CIR[cirId],cat=CATS.find(function(x){return x.id===catId;});
+  var rows=getStandings(cirId,catId);
+  var isCop=cat.type==='cop';
+  var qlim=QLIM[cirId]?QLIM[cirId][catId]||QLIM[cirId].def:null;
+  var stgs=STAGES.filter(function(s){return s.circuits.indexOf(cirId)>=0&&s.id!=='san-dona';});
+  if(!rows.length)return '<div class="se"><div style="font-size:32px;margin-bottom:12px">&#x1F4ED;</div><p>Nessun dato per <strong>'+cat.name+'</strong> &ndash; '+c.name+'</p><p style="font-size:12px;margin-top:8px">Carica i risultati dalla tab "Carica Tappa"</p></div>';
+  var stgCols=stgs.map(function(s){return '<th style="font-size:10px;text-align:center">'+s.name.substring(0,7)+(s.jollyFor.indexOf(cirId)>=0?'<br><span style="color:var(--red2)">J</span>':'')+'</th>';}).join('');
+  var bodyRows=rows.map(function(r,i){
+    var stgPts=stgs.map(function(s){var sp=null;for(var k=0;k<r.stages.length;k++){if(r.stages[k].stageId===s.id){sp=r.stages[k];break;}}return sp?'<td style="text-align:center;font-size:12px;'+(sp.isJolly?'color:var(--red2);font-weight:700':'')+'">'+(sp.ptsUsed)+(sp.isJolly?'&#x2605;':'')+'</td>':'<td style="text-align:center;color:var(--tx3)">&#x2014;</td>';}).join('');
+    var qBadge=(qlim&&i<qlim)?'<span class="qy">Q</span>':'';
+    return '<tr class="'+(isASD(r.assoc)?'hl':'')+'"><td><div style="display:flex;align-items:center;gap:6px"><span class="pb p'+(i<3?i+1:'x')+'">'+(i+1)+'</span>'+qBadge+'</div></td><td style="font-weight:'+(isASD(r.assoc)?600:400)+'">'+r.display+'</td><td style="font-size:12px;color:'+(isASD(r.assoc)?'var(--red)':'var(--tx2)')+'">'+r.assoc+'</td><td style="text-align:center;color:var(--tx3)">'+r.stages.length+'</td>'+stgPts+'<td><span class="pts" style="color:'+c.color+'">'+r.total+'</span></td></tr>';
+  }).join('');
+  var nStg=stgs.length;
+  var stgW=nStg?(38/nStg).toFixed(2):6;
+  var colGroup='<colgroup><col style="width:6%"><col style="width:22%"><col style="width:22%"><col style="width:5%">'+stgs.map(function(){return '<col style="width:'+stgW+'%">';}).join('')+'<col style="width:7%"></colgroup>';
+  return '<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap"><span style="font-family:var(--fh);font-weight:700;font-size:18px">'+cat.name+' &ndash; '+c.name+'</span>'+(qlim?'<span style="font-size:12px;color:var(--tx3);margin-left:auto">Finalissima: top <strong>'+qlim+'</strong></span>':'')+'</div><div class="tw"><table class="tcomp">'+colGroup+'<thead><tr><th>POS</th><th>'+(isCop?'Coppia':'Atleta')+'</th><th>ASD</th><th>Tap.</th>'+stgCols+'<th>TOTALE</th></tr></thead><tbody>'+bodyRows+'</tbody></table></div><div style="margin-top:10px;font-size:11px;color:var(--tx3)">&#x2605; = Tappa Jolly (punti &times;2) &mdash; Punteggi posizione: 1°=100, 2°=95...10°=55, dall\'11°=54 poi -1. Tappa Italia: 1°=100, 2°=99...</div>';
+}
+
+// FIX 2: buildStageDetail esclude bologna-ti dal dettaglio dei circuiti specifici
+function buildStageDetail(cirId,catId){
+  var cat=CATS.find(function(x){return x.id===catId;});
+  var isCop=cat.type==='cop';
+  var stgs=STAGES.filter(function(s){
+    if(s.id==='san-dona')return false;
+    if(!hasRes(s.id,catId))return false;
+    // TI non appare nel dettaglio grezzo dei circuiti specifici (ha il suo circuit='ti')
+    if(cirId!=='ti'&&isTappaItalia(s.id))return false;
+    return s.circuits.indexOf(cirId)>=0;
+  });
+  if(!stgs.length)return '';
+  var tabs=stgs.map(function(s,i){return '<button class="tb'+(i===0?' active':'')+'" onclick="showSD(this,\'sd-'+s.id+'\')">'+s.name+(s.jollyFor.indexOf(cirId)>=0?' &#x2B50;':'')+'</button>';}).join('');
+  var panels=stgs.map(function(s,i){
+    var res=getRes(s.id,catId);
+    var bodyRows=res.rows.map(function(r){return '<tr class="'+(isASD(r.assoc)?'hl':'')+'"><td><span class="pb p'+(r.pos<4?r.pos:'x')+'">'+r.pos+'</span></td>'+(isCop?'<td>'+(r.p1||'')+'</td><td>'+(r.p2||'')+'</td>':'<td>'+(r.cognome||'')+'</td><td>'+(r.nome||'')+'</td>')+'<td style="font-size:12px;color:'+(isASD(r.assoc)?'var(--red)':'var(--tx2)')+'">'+r.assoc+'</td><td style="color:var(--tx2);font-size:12px">'+r.tot+'</td><td class="pts">'+r.pts+'</td></tr>';}).join('');
+    return '<div id="sd-'+s.id+'" style="display:'+(i===0?'block':'none')+'"><div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap"><span style="font-size:12px;color:var(--tx3)">'+fmtDs(s.date)+'</span>'+(s.jollyFor.indexOf(cirId)>=0?'<span class="badge" style="background:rgba(230,51,41,.2);color:var(--red2)">JOLLY &times;2</span>':'')+'<span style="font-size:12px;color:var(--tx3)">Salvato: '+fmtDT(res.savedAt)+'</span>'+editBtn(s.id,catId)+'</div><div class="tw"><table><thead><tr><th>POS</th>'+(isCop?'<th>P1</th><th>P2</th>':'<th>Cognome</th><th>Nome</th>')+'<th>ASD</th><th>Tot. giudici</th><th>Punti tecnici</th></tr></thead><tbody>'+bodyRows+'</tbody></table></div></div>';
+  }).join('');
+  return '<div class="card"><div class="ct">&#x1F4CB; Dettaglio per tappa <span style="font-size:11px;color:var(--tx3);font-weight:400">(dati grezzi OCR)</span></div><div class="tg">'+tabs+'</div>'+panels+'</div>';
+}
+
+// Bottone Modifica (nascosto in modalità pubblica)
+function editBtn(sid,cid){
+  if(PUBLIC_MODE)return '';
+  return '<button class="btn bg bsm" style="margin-left:auto" onclick="editStageResult(\''+sid+'\',\''+cid+'\')">&#x270F;&#xFE0F; Modifica</button>';
+}
+
+// Apre il modal di revisione con i dati esistenti di una tappa per modificarli
+function editStageResult(stageId, catId){
+  var res=getRes(stageId, catId);
+  if(!res||!res.rows){alert('Nessun dato trovato per questa tappa.');return;}
+  resetCmp();
+  showModal(JSON.parse(JSON.stringify(res.rows)), stageId, catId);
+}
+
+function showSD(btn,id){btn.closest('.card').querySelectorAll('[id^="sd-"]').forEach(function(d){d.style.display='none';});btn.closest('.card').querySelectorAll('.tb').forEach(function(b){b.classList.remove('active');});document.getElementById(id).style.display='block';btn.classList.add('active');}
+
+// FIX 3+4: renderFin con tracker nazionale e ricerca ASD
+function renderFin(){
+  var el=document.getElementById('v-finalissima');
+  var cir=fnState.circuit,cat=fnState.cat;
+  var cirBtns=['nord','cs','sic'].map(function(c){return '<button class="tb'+(cir===c?' active':'')+'" style="'+(cir===c?'border-color:'+CIR[c].color+';color:'+CIR[c].color:'')+'" onclick="fnState.circuit=\''+c+'\';renderFin()">'+CIR[c].name+'</button>';}).join('');
+  var catBtns=CATS.map(function(c){return '<button class="tb'+(cat===c.id?' active':'')+'" style="'+(cat===c.id?'border-color:'+CIR[cir].color+';color:'+CIR[cir].color:'')+'" onclick="fnState.cat=\''+c.id+'\';renderFin()">'+c.name+'</button>';}).join('');
+  el.innerHTML=
+    '<h2 style="font-family:var(--fh);font-weight:800;font-size:28px;margin-bottom:16px">TRACKER <span style="color:var(--yel)">FINALISSIMA</span></h2>'+
+    '<div class="al ai" style="margin-bottom:20px">&#x2139;&#xFE0F; Nord/C-Sud: Top 10 per categoria (Camminatrici: top 15). Sicilia: Top 5 (Camminatrici: top 10).</div>'+
+    '<div class="eb"><button class="btn bg bsm" onclick="expDossierFinalissima()" title="Tutte le categorie e tutti i circuiti in un unico file Excel, un foglio per categoria">&#x1F4DA; Dossier Finalissima (Excel)</button> <button class="btn bg bsm" onclick="expFinalistiImg()" title="Una immagine PNG per categoria con i soli qualificati del circuito selezionato">&#x1F5BC;&#xFE0F; Immagini finalisti '+CIR[cir].name+'</button> <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;text-transform:none;letter-spacing:0;color:var(--tx2);margin:0 0 0 6px;cursor:pointer"><input type="checkbox" '+(fnState.finStages?'checked':'')+' onchange="fnState.finStages=this.checked" style="width:auto;margin:0"> con punti per tappa</label></div>'+
+    '<div class="tg">'+cirBtns+'</div>'+
+    '<div class="tg">'+catBtns+'</div>'+
+    '<div class="card" style="margin-bottom:20px">'+buildFinTable(cir,cat)+'</div>'+
+    buildNationalTracker(cat)+
+    buildASDSearch();
+  // Ripristina focus sull'input di ricerca se era attivo
+  setTimeout(function(){
+    var inp=document.getElementById('fn-asd-input');
+    if(inp&&fnState.asdQuery&&!fnState.asdSelected){inp.focus();}
+  },10);
+}
+
+function buildFinTable(cirId,catId){
+  var c=CIR[cirId],cat=CATS.find(function(x){return x.id===catId;});
+  var rows=getStandings(cirId,catId);
+  var isCop=cat.type==='cop';
+  var qlim=QLIM[cirId]?QLIM[cirId][catId]||QLIM[cirId].def:10;
+  if(!rows.length)return '<div class="se">Nessun dato per '+c.name+' &ndash; '+cat.name+'</div>';
+  var bodyRows=rows.map(function(r,i){return '<tr class="'+(isASD(r.assoc)?'hl':'')+'"><td><span class="pb p'+(i<3?i+1:'x')+'">'+(i+1)+'</span></td><td style="font-weight:'+(isASD(r.assoc)?600:400)+'">'+r.display+'</td><td style="font-size:12px;color:'+(isASD(r.assoc)?'var(--red)':'var(--tx2)')+'">'+r.assoc+'</td><td style="text-align:center;color:var(--tx3)">'+r.stages.length+'</td><td class="pts" style="color:'+c.color+'">'+r.total+'</td><td>'+(i<qlim?'<span class="qy">&#x2705; QUALIFICATO</span>':'<span class="qn">&mdash;</span>')+'</td></tr>';}).join('');
+  return '<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap"><span style="font-family:var(--fh);font-weight:700;font-size:18px">'+cat.name+' &ndash; '+c.name+'</span><span style="margin-left:auto;font-size:12px;color:var(--tx3)">Accesso: top <strong style="color:var(--yel)">'+qlim+'</strong></span></div><div class="tw"><table><thead><tr><th>POS</th><th>'+(isCop?'Coppia':'Atleta')+'</th><th>ASD</th><th>Tap.</th><th>Totale</th><th>Finalissima</th></tr></thead><tbody>'+bodyRows+'</tbody></table></div>';
+}
+
+// FIX 4: Tracker Nazionale per categoria selezionata
+function buildNationalTracker(catId){
+  var cat=CATS.find(function(c){return c.id===catId;});
+  if(!cat)return '';
+  var isCop=cat.type==='cop';
+  var cols=['nord','cs','sic'];
+  var colHtml=cols.map(function(cirId){
+    var c=CIR[cirId];
+    var rows=getStandings(cirId,catId);
+    var qlim=QLIM[cirId]?QLIM[cirId][catId]||QLIM[cirId].def:10;
+    if(!rows.length){
+      return '<div class="card" style="margin:0;border-top:3px solid '+c.color+'">'+
+        '<div style="font-family:var(--fh);font-weight:700;font-size:14px;color:'+c.color+';margin-bottom:10px">'+c.name+'</div>'+
+        '<div class="se" style="padding:20px 0;font-size:12px">Nessun dato</div>'+
+        '</div>';
+    }
+    var bodyRows=rows.map(function(r,i){
+      var badge=i<qlim
+        ?'<span class="qy" style="font-size:10px;padding:1px 5px">Q</span>'
+        :'';
+      return '<tr class="'+(isASD(r.assoc)?'hl':'')+'">'+
+        '<td style="padding:5px 8px;white-space:nowrap">'+
+          '<span class="pb p'+(i<3?i+1:'x')+'" style="width:20px;height:20px;font-size:11px">'+(i+1)+'</span>'+
+          ' '+badge+
+        '</td>'+
+        '<td style="padding:5px 8px;font-size:12px;font-weight:'+(isASD(r.assoc)?600:400)+';max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+r.display+'">'+r.display+'</td>'+
+        '<td style="padding:5px 8px;text-align:right;font-family:var(--fh);font-weight:700;font-size:13px;color:'+c.color+'">'+r.total+'</td>'+
+        '</tr>';
+    }).join('');
+    return '<div class="card" style="margin:0;border-top:3px solid '+c.color+'">'+
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">'+
+        '<span style="font-family:var(--fh);font-weight:700;font-size:14px;color:'+c.color+'">'+c.name+'</span>'+
+        '<span style="font-size:11px;color:var(--tx3)">top <strong>'+qlim+'</strong></span>'+
+      '</div>'+
+      '<div class="tw"><table width="100%"><tbody>'+bodyRows+'</tbody></table></div>'+
+      '</div>';
+  }).join('');
+  return '<div style="margin-bottom:20px">'+
+    '<div style="font-family:var(--fh);font-weight:700;font-size:16px;margin-bottom:12px">&#x1F30D; Tracker Nazionale &mdash; <span style="color:var(--red)">'+cat.name+'</span></div>'+
+    '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">'+colHtml+'</div>'+
+    '</div>';
+}
+
+// FIX 3: Ricerca ASD con autocomplete (sostituisce sezione fissa)
+function buildASDSearch(){
+  var q=fnState.asdQuery||'';
+  var sel=fnState.asdSelected||'';
+  var allASD=getAllASD().sort();
+  var filtered=q&&!sel
+    ?allASD.filter(function(a){return a.toLowerCase().indexOf(q.toLowerCase())>=0;}).slice(0,8)
+    :[];
+
+  var dropHtml='';
+  if(filtered.length){
+    dropHtml='<div style="position:absolute;top:100%;left:0;right:0;background:var(--s1);border:1px solid var(--brd);border-radius:0 0 8px 8px;z-index:100;box-shadow:0 4px 12px rgba(0,0,0,.15);overflow:hidden;margin-top:-2px">'+
+      filtered.map(function(a){
+        var safe=a.replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'&quot;');
+        return '<div onclick="selectASDSearch(\''+safe+'\')" style="padding:10px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--brd)" onmouseover="this.style.background=\'var(--s2)\'" onmouseout="this.style.background=\'\'">'+a+'</div>';
+      }).join('')+
+    '</div>';
+  }
+
+  var resultsHtml='';
+  if(sel){
+    resultsHtml=buildASDQualTable(sel);
+  }
+
+  var clearBtn=sel||q
+    ?'<button onclick="fnState.asdQuery=\'\';fnState.asdSelected=\'\';renderFin()" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--tx3);cursor:pointer;font-size:16px;line-height:1">&#x2715;</button>'
+    :'';
+
+  return '<div class="card" style="border-left:3px solid var(--grn)">'+
+    '<div style="font-family:var(--fh);font-weight:700;font-size:16px;margin-bottom:12px">&#x1F50D; Cerca ASD</div>'+
+    '<div style="position:relative;margin-bottom:'+(filtered.length?'0':'12')+'px">'+
+      '<input type="text" id="fn-asd-input" placeholder="Digita il nome della tua ASD..." value="'+q.replace(/"/g,'&quot;')+'" '+
+        'oninput="fnState.asdQuery=this.value;fnState.asdSelected=\'\';renderFin()" '+
+        'style="width:100%;padding:10px 36px 10px 12px;background:var(--s2);border:1px solid var(--brd);border-radius:'+(filtered.length?'8px 8px 0 0':'8px')+';color:var(--tx);font-size:13px;outline:none">'+
+      clearBtn+
+      dropHtml+
+    '</div>'+
+    (sel
+      ?'<div style="display:flex;align-items:center;gap:8px;margin:12px 0 10px">'+
+          '<span style="font-size:13px;font-weight:600;color:var(--tx)">'+sel+'</span>'+
+          '<span style="display:inline-block;padding:2px 8px;background:var(--grn)22;color:var(--grn);border-radius:10px;font-size:11px;font-weight:600">selezionata</span>'+
+        '</div>'+
+        resultsHtml
+      : (!q?'<p style="font-size:12px;color:var(--tx3);margin-top:4px">Inizia a digitare per cercare la tua ASD</p>':'')
+    )+
+  '</div>';
+}
+
+function selectASDSearch(asdName){
+  fnState.asdQuery=asdName;
+  fnState.asdSelected=asdName;
+  renderFin();
+}
+
+function buildASDQualTable(asdName){
+  var found=[];
+  ['nord','cs','sic'].forEach(function(cirId){
+    CATS.forEach(function(cat){
+      var rows=getStandings(cirId,cat.id);
+      var qlim=QLIM[cirId]?QLIM[cirId][cat.id]||QLIM[cirId].def:10;
+      rows.filter(function(r){
+        return r.assoc.toLowerCase().indexOf(asdName.toLowerCase())>=0;
+      }).forEach(function(r){
+        found.push(Object.assign({},r,{cirId:cirId,catName:cat.name,catId:cat.id,qlim:qlim}));
+      });
+    });
+  });
+  if(!found.length){
+    return '<div class="se" style="padding:24px 0">Nessun atleta trovato per questa ASD nei dati caricati.</div>';
+  }
+  found.sort(function(a,b){
+    var aQ=a.pos<=a.qlim?0:1;
+    var bQ=b.pos<=b.qlim?0:1;
+    if(aQ!==bQ)return aQ-bQ;
+    return a.pos-b.pos;
+  });
+  var rows=found.map(function(r){
+    return '<tr>'+
+      '<td style="padding:8px 12px;font-weight:600">'+r.display+'</td>'+
+      '<td style="padding:8px 12px"><span style="color:'+CIR[r.cirId].color+';font-size:12px;font-weight:600">'+CIR[r.cirId].name+'</span></td>'+
+      '<td style="padding:8px 12px;font-size:12px;color:var(--tx2)">'+r.catName+'</td>'+
+      '<td style="padding:8px 12px;text-align:center"><span class="pb p'+(r.pos<4?r.pos:'x')+'" style="width:22px;height:22px;font-size:12px">'+r.pos+'</span></td>'+
+      '<td style="padding:8px 12px;text-align:right;font-family:var(--fh);font-weight:700;color:'+CIR[r.cirId].color+'">'+r.total+'</td>'+
+      '<td style="padding:8px 12px">'+
+        (r.pos<=r.qlim
+          ?'<span class="qy">&#x2705; QUALIFICATO</span>'
+          :'<span class="qn">&mdash;</span>')+
+      '</td>'+
+      '</tr>';
+  }).join('');
+  return '<div class="tw"><table width="100%">'+
+    '<thead><tr>'+
+      '<th>Atleta / Coppia</th>'+
+      '<th>Circuito</th>'+
+      '<th>Categoria</th>'+
+      '<th style="text-align:center">Pos.</th>'+
+      '<th style="text-align:right">Totale</th>'+
+      '<th>Finalissima</th>'+
+    '</tr></thead>'+
+    '<tbody>'+rows+'</tbody>'+
+    '</table></div>';
+}
+
+var atState={query:'',selected:null};
+
+function getAllAthletes(){
+  var indCats=CATS.filter(function(c){return c.type==='ind';});
+  var map={};
+  indCats.forEach(function(cat){
+    Object.values(DB.results).forEach(function(res){
+      if(res.catId!==cat.id)return;
+      res.rows.forEach(function(row){
+        var key=indKey(row.cognome,row.nome)+'__'+cat.id;
+        if(!map[key]){
+          map[key]={
+            key:key,
+            display:canonPerson(((row.cognome||'')+' '+(row.nome||'')).trim()),
+            cognome:row.cognome||'',
+            nome:row.nome||'',
+            assoc:row.assoc||'',
+            catId:cat.id,
+            catName:cat.name
+          };
+        } else if(row.assoc) {
+          map[key].assoc=row.assoc;
+        }
+      });
+    });
+  });
+  return Object.values(map).sort(function(a,b){return a.display.localeCompare(b.display);});
+}
+
+function searchAthletes(query){
+  var q=(query||'').trim().toLowerCase();
+  var all=getAllAthletes();
+  if(!q)return all.slice(0,50);
+  return all.filter(function(a){
+    return a.display.toLowerCase().indexOf(q)>=0 || a.assoc.toLowerCase().indexOf(q)>=0;
+  }).slice(0,30);
+}
+
+function getAthleteHistory(athlete){
+  var history=[];
+  STAGES.forEach(function(st){
+    if(st.id==='san-dona')return;
+    var res=getRes(st.id,athlete.catId);
+    if(!res)return;
+    for(var i=0;i<res.rows.length;i++){
+      var r=res.rows[i];
+      if(indKey(r.cognome,r.nome)===indKey(athlete.cognome,athlete.nome)){
+        var cirId=getAthleteCircuit(athlete.assoc)||st.circuits[0];
+        var ptsPos=isTappaItalia(st.id)?posToPointsTI(r.pos):posToPoints(r.pos);
+        var jolly=st.jollyFor.indexOf(cirId)>=0;
+        history.push({
+          stageId:st.id,
+          stageName:st.name,
+          stageDate:st.date,
+          circuits:st.circuits,
+          jollyFor:st.jollyFor,
+          pos:r.pos,
+          tot:r.tot,
+          pts:r.pts,
+          ptsNum:ptsPos,
+          ptsUsed:jolly?ptsPos*2:ptsPos,
+          isJolly:jolly
+        });
+        break;
+      }
+    }
+  });
+  return history;
+}
+
+function getAthleteCircuit(asd){
+  var c=getASDCircuito(asd);
+  if(c==='nd'||c==='tutti')return null;
+  return c;
+}
+
+function getAthleteCurrentRank(athlete){
+  var cir=getAthleteCircuit(athlete.assoc);
+  if(!cir)return null;
+  var standings=getStandings(cir,athlete.catId);
+  var key=indKey(athlete.cognome,athlete.nome);
+  for(var i=0;i<standings.length;i++){
+    if(standings[i].key===key){
+      return {pos:standings[i].pos,total:standings[i].total,circuit:cir,allStandings:standings};
+    }
+  }
+  return null;
+}
+
+function getQualThreshold(catId, cirId){
+  if(catId==='camminatore-f'){
+    if(cirId==='sic')return 10;
+    return 15;
+  }
+  if(cirId==='sic')return 5;
+  return 10;
+}
+
+function renderAtleta(){
+  var el=document.getElementById('v-atleta');
+  var q=atState.query;
+  var results=searchAthletes(q);
+  
+  var listHtml='';
+  if(results.length===0){
+    listHtml='<div class="se">Nessun atleta trovato</div>';
+  } else {
+    listHtml=results.map(function(a){
+      var isSel=atState.selected&&atState.selected.key===a.key;
+      return '<div class="atl-item" onclick="selectAtleta(this)" data-key="'+a.key.replace(/"/g,'&quot;')+'" style="padding:10px 14px;border:1px solid '+(isSel?'#8b5cf6':'var(--brd)')+';border-radius:8px;margin-bottom:6px;cursor:pointer;background:'+(isSel?'rgba(139,92,246,.08)':'transparent')+'">'+
+        '<div style="font-weight:600;color:var(--tx)">'+a.display+'</div>'+
+        '<div style="font-size:11px;color:var(--tx3);margin-top:2px">'+a.assoc+' &middot; '+a.catName+'</div>'+
+        '</div>';
+    }).join('');
+  }
+  
+  var detailHtml='';
+  if(atState.selected){
+    detailHtml=buildAtletaDetail(atState.selected);
+  } else {
+    detailHtml='<div style="text-align:center;padding:60px 20px;color:var(--tx3)"><div style="font-size:48px;margin-bottom:12px">&#x1F3C3;</div><div>Cerca un atleta a sinistra per vedere il profilo</div></div>';
+  }
+  
+  el.innerHTML='<h2 style="font-family:var(--fh);font-weight:800;font-size:28px;margin-bottom:16px">PROFILO <span style="color:#8b5cf6">ATLETA</span></h2>'+
+    '<div style="display:grid;grid-template-columns:340px 1fr;gap:20px" class="atl-grid">'+
+    '<div><div class="card"><div class="fg"><label>Cerca per nome o ASD</label><input type="text" id="at-search" value="'+q.replace(/"/g,'&quot;')+'" placeholder="es. taffarello, sile walking..." oninput="atState.query=this.value;renderAtletaList()"></div><div id="at-list" style="max-height:560px;overflow-y:auto">'+listHtml+'</div></div></div>'+
+    '<div id="at-detail">'+detailHtml+'</div>'+
+    '</div>';
+  
+  setTimeout(function(){
+    var inp=document.getElementById('at-search');
+    if(inp&&document.activeElement!==inp){
+      inp.focus();
+      var v=inp.value;
+      inp.setSelectionRange(v.length,v.length);
+    }
+  },10);
+}
+
+function renderAtletaList(){
+  var listEl=document.getElementById('at-list');
+  if(!listEl)return;
+  var results=searchAthletes(atState.query);
+  if(results.length===0){
+    listEl.innerHTML='<div class="se">Nessun atleta trovato</div>';
+    return;
+  }
+  listEl.innerHTML=results.map(function(a){
+    var isSel=atState.selected&&atState.selected.key===a.key;
+    return '<div class="atl-item" onclick="selectAtleta(this)" data-key="'+a.key.replace(/"/g,'&quot;')+'" style="padding:10px 14px;border:1px solid '+(isSel?'#8b5cf6':'var(--brd)')+';border-radius:8px;margin-bottom:6px;cursor:pointer;background:'+(isSel?'rgba(139,92,246,.08)':'transparent')+'">'+
+      '<div style="font-weight:600;color:var(--tx)">'+a.display+'</div>'+
+      '<div style="font-size:11px;color:var(--tx3);margin-top:2px">'+a.assoc+' &middot; '+a.catName+'</div>'+
+      '</div>';
+  }).join('');
+}
+
+function selectAtleta(elem){
+  var key=elem.dataset.key;
+  var all=getAllAthletes();
+  var found=all.find(function(a){return a.key===key;});
+  if(found){
+    atState.selected=found;
+    renderAtleta();
+  }
+}
+
+function buildAtletaDetail(athlete){
+  var history=getAthleteHistory(athlete);
+  var rank=getAthleteCurrentRank(athlete);
+  var cir=getAthleteCircuit(athlete.assoc);
+  
+  var nStages=history.length;
+  var avgPos=nStages?(history.reduce(function(s,h){return s+(+h.pos||0);},0)/nStages).toFixed(1):'-';
+  var bestPos=nStages?Math.min.apply(null,history.map(function(h){return +h.pos||999;})):'-';
+  var worstPos=nStages?Math.max.apply(null,history.map(function(h){return +h.pos||0;})):'-';
+  
+  var headerHtml='<div class="card" style="margin-bottom:16px;border-left:4px solid #8b5cf6">'+
+    '<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px">'+
+    '<div>'+
+    '<div style="font-family:var(--fh);font-weight:800;font-size:24px;color:var(--tx)">'+athlete.display+'</div>'+
+    '<div style="color:var(--tx2);font-size:14px;margin-top:4px">'+athlete.assoc+'</div>'+
+    '<div style="margin-top:8px"><span style="display:inline-block;padding:3px 10px;background:rgba(139,92,246,.1);color:#8b5cf6;border-radius:12px;font-size:11px;font-weight:600">'+athlete.catName+'</span>'+
+    (cir?' <span style="display:inline-block;padding:3px 10px;background:'+CIR[cir].color+'22;color:'+CIR[cir].color+';border-radius:12px;font-size:11px;font-weight:600;margin-left:6px">'+CIR[cir].name+'</span>':'')+
+    '</div></div>'+
+    (rank?'<div style="text-align:right"><div style="font-size:11px;color:var(--tx3);text-transform:uppercase;letter-spacing:1px">Pos. classifica</div><div style="font-family:var(--fh);font-weight:800;font-size:36px;color:'+CIR[cir].color+';line-height:1">'+rank.pos+'<span style="font-size:18px">&deg;</span></div><div style="font-size:13px;color:var(--tx2);margin-top:2px">'+rank.total+' pt</div></div>':'')+
+    '</div></div>';
+  
+  var statsHtml='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:16px">'+
+    '<div class="card" style="margin:0;text-align:center"><div style="font-size:11px;color:var(--tx3);text-transform:uppercase">Tappe</div><div style="font-family:var(--fh);font-weight:800;font-size:32px;color:var(--tx)">'+nStages+'</div></div>'+
+    '<div class="card" style="margin:0;text-align:center"><div style="font-size:11px;color:var(--tx3);text-transform:uppercase">Pos. media</div><div style="font-family:var(--fh);font-weight:800;font-size:32px;color:var(--tx)">'+avgPos+'</div></div>'+
+    '<div class="card" style="margin:0;text-align:center"><div style="font-size:11px;color:var(--tx3);text-transform:uppercase">Migliore</div><div style="font-family:var(--fh);font-weight:800;font-size:32px;color:var(--grn)">'+bestPos+(typeof bestPos==='number'?'&deg;':'')+'</div></div>'+
+    '<div class="card" style="margin:0;text-align:center"><div style="font-size:11px;color:var(--tx3);text-transform:uppercase">Peggiore</div><div style="font-family:var(--fh);font-weight:800;font-size:32px;color:var(--tx2)">'+worstPos+(typeof worstPos==='number'?'&deg;':'')+'</div></div>'+
+    '</div>';
+  
+  var historyHtml='';
+  if(history.length){
+    var histRows=history.map(function(h){
+      var jollyMark=h.isJolly?' <span style="color:var(--red2);font-size:10px;font-weight:700">JOLLY x2</span>':'';
+      var medal=h.pos<=3?(h.pos===1?'&#x1F947;':h.pos===2?'&#x1F948;':'&#x1F949;'):'';
+      var tiMark=isTappaItalia(h.stageId)?' <span style="color:var(--ti);font-size:10px;font-weight:700">TI</span>':'';
+      return '<tr><td style="padding:8px 12px">'+fmtDs(h.stageDate)+'</td>'+
+        '<td style="padding:8px 12px;font-weight:500">'+h.stageName+tiMark+jollyMark+'</td>'+
+        '<td style="padding:8px 12px;text-align:center"><strong>'+h.pos+'&deg;</strong> '+medal+'</td>'+
+        '<td style="padding:8px 12px;text-align:right;color:var(--tx3)">'+h.ptsNum+'</td>'+
+        '<td style="padding:8px 12px;text-align:right;color:var(--red);font-weight:600">'+h.ptsUsed+'</td>'+
+        '</tr>';
+    }).join('');
+    historyHtml='<div class="card" style="margin-bottom:16px"><div class="ct">&#x1F4CA; Storico tappe</div><div class="tw"><table width="100%"><thead><tr><th style="text-align:left">Data</th><th style="text-align:left">Tappa</th><th style="text-align:center">Pos.</th><th style="text-align:right">Pt pos.</th><th style="text-align:right">Pt usati</th></tr></thead><tbody>'+histRows+'</tbody></table></div></div>';
+  }
+  
+  var finHtml='';
+  if(rank&&cir){
+    var threshold=getQualThreshold(athlete.catId,cir);
+    var qualified=rank.pos<=threshold;
+    var standings=rank.allStandings;
+    
+    var distanceHtml='';
+    if(qualified){
+      var nextBehind=standings[threshold];
+      if(nextBehind){
+        var gap=(rank.total-nextBehind.total);
+        distanceHtml='<div style="margin-top:8px;font-size:13px;color:var(--tx2)">Vantaggio sul '+(threshold+1)+'&deg;: <strong style="color:var(--grn)">+'+gap+' pt</strong></div>';
+      }
+    } else {
+      var cutoff=standings[threshold-1];
+      if(cutoff){
+        var gap=(cutoff.total-rank.total);
+        distanceHtml='<div style="margin-top:8px;font-size:13px;color:var(--tx2)">Per qualificarti devi recuperare: <strong style="color:var(--red)">'+gap+' pt</strong> sul '+threshold+'&deg; posto</div>';
+      }
+    }
+    
+    var stgs=STAGES.filter(function(s){return s.circuits.indexOf(cir)>=0&&s.id!=='san-dona';});
+    var done={};history.forEach(function(h){done[h.stageId]=true;});
+    var remaining=stgs.filter(function(s){return !done[s.id];});
+    
+    var remHtml='';
+    if(remaining.length){
+      remHtml='<div style="margin-top:12px;font-size:13px;color:var(--tx2)">Tappe rimanenti: '+remaining.map(function(s){return s.name+(s.jollyFor.indexOf(cir)>=0?' (Jolly)':'');}).join(', ')+'</div>';
+    } else {
+      remHtml='<div style="margin-top:12px;font-size:13px;color:var(--tx3)">Tutte le tappe del circuito disputate</div>';
+    }
+    
+    finHtml='<div class="card" style="border-left:4px solid '+(qualified?'var(--grn)':'var(--red)')+'">'+
+      '<div class="ct">&#x1F3C6; Qualificazione Finalissima</div>'+
+      '<div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">'+
+      '<div style="font-size:32px">'+(qualified?'&#x2705;':'&#x26A0;&#xFE0F;')+'</div>'+
+      '<div style="flex:1;min-width:200px">'+
+      '<div style="font-weight:600;font-size:15px;color:'+(qualified?'var(--grn)':'var(--red)')+'">'+(qualified?'Qualificato':'Fuori qualificazione')+'</div>'+
+      '<div style="font-size:13px;color:var(--tx2);margin-top:2px">Posizione attuale '+rank.pos+'&deg; &middot; Soglia: top '+threshold+'</div>'+
+      distanceHtml+
+      remHtml+
+      '</div></div></div>';
+  } else if(!cir) {
+    finHtml='<div class="al ai">L\'ASD di questo atleta non e ancora stata assegnata a un circuito. Vai nella tab <strong>ASD</strong> per assegnarla.</div>';
+  }
+  
+  return headerHtml+statsHtml+historyHtml+finHtml;
+}
+
+// ── PUNTEGGI POSIZIONE ────────────────────────────────────────
+var POS_POINTS=[100,95,90,85,80,75,70,65,60,55];
+function posToPoints(pos){
+  if(pos<=0)return 0;
+  if(pos<=10)return POS_POINTS[pos-1];
+  return Math.max(1, 54-(pos-11));
+}
+
+function posToPointsTI(pos){
+  if(pos<=0)return 0;
+  return Math.max(1, 101-pos);
+}
+
+function isTappaItalia(stageId){ return stageId==='bologna-ti'; }
+
+// ── REQUISITO ISTRUTTORE + CAMMINATORE (regolamento punto 26) ──
+// Restituisce null se l'ASD in quella tappa ha almeno un istruttore (M o F)
+// e almeno un camminatore (M o F); altrimenti il testo di cosa manca.
+function asdStageMissing(catMap){
+  catMap=catMap||{};
+  var hasI=!!((catMap['istruttore-m']||[]).length||(catMap['istruttore-f']||[]).length);
+  var hasC=!!((catMap['camminatore-m']||[]).length||(catMap['camminatore-f']||[]).length);
+  if(hasI&&hasC)return null;
+  if(!hasI&&!hasC)return 'manca istruttore e camminatore';
+  return hasI?'manca camminatore':'manca istruttore';
+}
+function stageName(id){
+  var s=STAGES.find(function(x){return x.id===id;});
+  return s?(s.name+(isTappaItalia(id)?' (TI)':'')):id;
+}
+
+// ── CLASSIFICA ASD PER CIRCUITO ──────────────────────────────
+// FIX 7 (regola confermata dagli organizzatori, set. 2026):
+// - Classifica ASD di CIRCUITO: si sommano TUTTE le tappe del circuito (Tappa Italia inclusa,
+//   Jolly x2) — regolamento punto 25.
+// - Classifica NAZIONALE: 3 migliori tappe del circuito + Tappa Italia + Finalissima (punto 26).
+//   Per questo ogni riga restituisce anche il dettaglio per tappa (r.stages).
+function getASDCircuitStandings(cirId){
+  var indCats=CATS.filter(function(c){return c.type==='ind';});
+  // La Tappa Italia È una tappa a tutti gli effetti di ogni circuito (circuits:['ti','nord','cs','sic']).
+  // I punti TI confluiscono nel circuito di appartenenza dell'ASD (filtro getASDCircuito più sotto).
+  // Solo la Finalissima è esclusa dai circuiti.
+  var stgs=STAGES.filter(function(s){
+    return s.circuits.indexOf(cirId)>=0&&s.id!=='san-dona';
+  });
+  // asdStagePts[canon] = array dei punti ottenuti da quell'ASD in ciascuna tappa disputata
+  var asdStagePts={};
+
+  for(var si=0;si<stgs.length;si++){
+    var st=stgs[si];
+    var isJolly=st.jollyFor.indexOf(cirId)>=0;
+    // NB: nella classifica ASD a squadre TUTTE le tappe (Tappa Italia inclusa) usano la scala
+    // standard 100/95/90/85… (punto 23). La scala 100/99/98… del punto 24 vale solo per le
+    // classifiche individuali e a coppie, non per le squadre.
+    // Group athletes by ASD and category for this stage
+    var stageData={};
+    for(var ci=0;ci<indCats.length;ci++){
+      var cat=indCats[ci];
+      var res=getRes(st.id,cat.id);
+      if(!res)continue;
+      for(var ri=0;ri<res.rows.length;ri++){
+        var row=res.rows[ri];
+        var asd=row.assoc||'';
+        if(!asd)continue;
+        if(isNoASD(asd)||isNoASD(getASDCanonicalName(asd)))continue;
+        var ac=getASDCircuito(asd);
+        if(ac!=='nd'&&ac!=='tutti'&&ac!==cirId)continue;
+        var canon=getASDCanonicalName(asd);
+        if(!stageData[canon])stageData[canon]={};
+        if(!stageData[canon][cat.id])stageData[canon][cat.id]=[];
+        stageData[canon][cat.id].push(parseInt(row.pos)||0);
+      }
+    }
+    // Per ASD: best per category gets full points, others get 10 (top10) or 5 (11th+)
+    Object.keys(stageData).forEach(function(canon){
+      var stagePts=0;
+      indCats.forEach(function(cat){
+        var poss=stageData[canon][cat.id]||[];
+        if(!poss.length)return;
+        poss.sort(function(a,b){return a-b;});
+        stagePts+=posToPoints(poss[0]);
+        for(var k=1;k<poss.length;k++){stagePts+=(poss[k]<=10?10:5);}
+      });
+      if(isJolly)stagePts*=2;
+      // Punto 26: senza almeno un istruttore E un camminatore la tappa vale 0
+      var miss=asdStageMissing(stageData[canon]);
+      if(miss)stagePts=0;
+      if(!asdStagePts[canon])asdStagePts[canon]=[];
+      asdStagePts[canon].push({stageId:st.id,pts:stagePts,isTI:isTappaItalia(st.id),missing:miss});
+    });
+  }
+
+  // Classifica di circuito: somma di TUTTE le tappe disputate
+  var asdMap={};
+  Object.keys(asdStagePts).forEach(function(canon){
+    var list=asdStagePts[canon];
+    var total=list.reduce(function(s,x){return s+x.pts;},0);
+    asdMap[canon]={asd:canon,total:total,stages:list};
+  });
+
+  return Object.values(asdMap).sort(function(a,b){return b.total-a.total;}).map(function(a,i){a.pos=i+1;return a;});
+}
+
+// ── CLASSIFICA ASD NAZIONALE ─────────────────────────────────
+// Single-stage helper: best per category gets full points, others 10/5
+function getASDStagePts(stageId,useTiScale){
+  var indCats=CATS.filter(function(c){return c.type==='ind';});
+  var stageData={};
+  for(var ci=0;ci<indCats.length;ci++){
+    var cat=indCats[ci];
+    var res=getRes(stageId,cat.id);
+    if(!res)continue;
+    for(var ri=0;ri<res.rows.length;ri++){
+      var row=res.rows[ri];
+      var asd=row.assoc||'';
+      if(!asd)continue;
+      if(isNoASD(asd)||isNoASD(getASDCanonicalName(asd)))continue;
+      var canon=getASDCanonicalName(asd);
+      if(!stageData[canon])stageData[canon]={};
+      if(!stageData[canon][cat.id])stageData[canon][cat.id]=[];
+      stageData[canon][cat.id].push(parseInt(row.pos)||0);
+    }
+  }
+  var result={};
+  Object.keys(stageData).forEach(function(canon){
+    var stagePts=0;
+    indCats.forEach(function(cat){
+      var poss=stageData[canon][cat.id]||[];
+      if(!poss.length)return;
+      poss.sort(function(a,b){return a-b;});
+      stagePts+=(useTiScale?posToPointsTI(poss[0]):posToPoints(poss[0]));
+      for(var k=1;k<poss.length;k++){stagePts+=(poss[k]<=10?10:5);}
+    });
+    // Punto 26: senza almeno un istruttore E un camminatore la tappa vale 0
+    if(asdStageMissing(stageData[canon]))stagePts=0;
+    result[canon]=stagePts;
+  });
+  return result;
+}
+
+function getASDNationalStandings(){
+  // Per ogni ASD: 3 migliori tappe di circuito (TI esclusa dalla scelta) + Tappa Italia + Finalissima.
+  // Le tappe arrivano dal dettaglio di circuito (regola punto 26 gia' applicata).
+  // Un'ASD senza circuito assegnato compare in piu' circuiti: le tappe sono deduplicate
+  // per id, cosi' la Tappa Italia viene contata una sola volta.
+  var asdMap={};
+  ['nord','cs','sic'].forEach(function(cirId){
+    getASDCircuitStandings(cirId).forEach(function(r){
+      if(!asdMap[r.asd])asdMap[r.asd]={asd:r.asd,cirs:[],stById:{}};
+      var m=asdMap[r.asd];
+      if(m.cirs.indexOf(cirId)<0)m.cirs.push(cirId);
+      r.stages.forEach(function(x){m.stById[x.stageId]=x;});
+    });
+  });
+  var finPts=getASDStagePts('san-dona',false);
+  Object.keys(finPts).forEach(function(asd){
+    if(!asdMap[asd])asdMap[asd]={asd:asd,cirs:[],stById:{}};
+  });
+  return Object.values(asdMap).map(function(m){
+    var all=Object.values(m.stById);
+    var circ=all.filter(function(x){return !x.isTI;}).sort(function(a,b){return b.pts-a.pts;});
+    var best3=circ.slice(0,3);
+    var tiSt=all.filter(function(x){return x.isTI;})[0]||null;
+    var ti=tiSt?tiSt.pts:0;
+    var fin=finPts[m.asd]||0;
+    var total=best3.reduce(function(s,x){return s+x.pts;},0)+ti+fin;
+    return {asd:m.asd,cirs:m.cirs,best3:best3,tiSt:tiSt,ti:ti,fin:fin,hasFin:(m.asd in finPts),total:total};
+  }).sort(function(a,b){return b.total-a.total;}).map(function(a,i){a.pos=i+1;return a;});
+}
+
+// ── TABELLE ASD CON PUNTEGGI PER TAPPA ────────────────────────
+// Una sola sorgente dati per video, CSV, Excel e dossier.
+function asdStageLabel(st,cirId){
+  var n=isTappaItalia(st.id)?'TI '+st.name:st.name;
+  if(st.jollyFor.indexOf(cirId)>=0)n+=' (J×2)';
+  return n;
+}
+function asdCircTable(cirId){
+  var stgs=STAGES.filter(function(s){return s.circuits.indexOf(cirId)>=0&&s.id!=='san-dona';});
+  var rows=getASDCircuitStandings(cirId);
+  var head=['POS','ASD'].concat(stgs.map(function(s){return asdStageLabel(s,cirId);})).concat(['TOTALE']);
+  var data=rows.map(function(r){
+    var byId={};r.stages.forEach(function(x){byId[x.stageId]=x;});
+    return {r:r,cells:stgs.map(function(s){return byId[s.id]||null;})};
+  });
+  return {stgs:stgs,head:head,data:data};
+}
+function asdCircAOA(cirId){
+  var t=asdCircTable(cirId);
+  var aoa=[t.head];
+  t.data.forEach(function(d){
+    aoa.push([d.r.pos,d.r.asd].concat(d.cells.map(function(c){
+      return c?(c.missing?'0 ('+c.missing+')':c.pts):'';
+    })).concat([d.r.total]));
+  });
+  return aoa;
+}
+function asdNatAOA(){
+  var aoa=[['POS','ASD','CIRCUITO','TAPPA 1','PUNTI','TAPPA 2','PUNTI','TAPPA 3','PUNTI','TAPPA ITALIA','FINALISSIMA','TOTALE']];
+  getASDNationalStandings().forEach(function(r){
+    var row=[r.pos,r.asd,r.cirs.map(function(c){return CIR[c]?CIR[c].name:c;}).join('/')];
+    for(var k=0;k<3;k++){var b=r.best3[k];row.push(b?stageName(b.stageId):'',b?b.pts:'');}
+    row.push(r.tiSt?(r.tiSt.missing?'0 ('+r.tiSt.missing+')':r.ti):'',r.hasFin?r.fin:'',r.total);
+    aoa.push(row);
+  });
+  return aoa;
+}
+
+// ── ASD CIRCUITI ─────────────────────────────────────────────
+var ASD_MAP = {};    // asd_name -> circuito
+var ASD_CANON = {};  // asd_name -> nome_canonico
+var _asdGroups = []; // detected similarity groups
+
+async function loadASDMap(){
+  try{
+    var resp=await fetch(SUPA_URL+'/rest/v1/asd_circuiti?select=*',{headers:supaHeaders()});
+    var data=await resp.json();
+    ASD_MAP={};ASD_CANON={};
+    if(Array.isArray(data)) data.forEach(function(r){
+      ASD_MAP[r.asd_name]=r.circuito;
+      ASD_CANON[r.asd_name]=r.nome_canonico||r.asd_name;
+    });
+  }catch(e){console.error('loadASDMap error',e);}
+}
+
+async function saveASDCircuito(asdName, circuito){
+  ASD_MAP[asdName]=circuito;
+  try{
+    await fetch(SUPA_URL+'/rest/v1/asd_circuiti',{
+      method:'POST',
+      headers:Object.assign({},supaHeaders(),{'Prefer':'resolution=merge-duplicates'}),
+      body:JSON.stringify({asd_name:asdName,circuito:circuito})
+    });
+  }catch(e){console.error('saveASDCircuito error',e);}
+}
+
+async function saveASDCanonical(asdName, nomeCanon){
+  ASD_CANON[asdName]=nomeCanon||asdName;
+  try{
+    await fetch(SUPA_URL+'/rest/v1/asd_circuiti',{
+      method:'POST',
+      headers:Object.assign({},supaHeaders(),{'Prefer':'resolution=merge-duplicates'}),
+      body:JSON.stringify({asd_name:asdName,nome_canonico:nomeCanon||null})
+    });
+  }catch(e){console.error('saveASDCanonical error',e);}
+}
+
+function getAllASD(){
+  var asdSet={};
+  var indIds=CATS.filter(function(c){return c.type==='ind';}).map(function(c){return c.id;});
+  Object.values(DB.results).forEach(function(res){
+    if(indIds.indexOf(res.catId)<0)return;
+    res.rows.forEach(function(row){
+      var a=row.assoc||'';
+      if(a) asdSet[a]=true;
+    });
+  });
+  return Object.keys(asdSet).sort();
+}
+
+function getASDCircuito(asdName){
+  return ASD_MAP[asdName]||'nd';
+}
+
+/* Atleti senza societa': "Indipendente", "Nessuna Asd", "INDIVIDUALE"...
+   Non sono societa' e non devono portare punti a nessuna squadra, altrimenti
+   in classifica ASD compaiono squadre fantasma di un solo atleta.
+   NB: la classifica INDIVIDUALE non e' toccata, l'app raggruppa per nome. */
+var NO_ASD_RX=/^(indipendent[ei]|individuale|nessuna\s*asd.*|libero\s*professionista|senza\s*asd.*)$/;
+function isNoASD(a){
+  var t=(a||'').toLowerCase().replace(/[^a-z\s]/g,' ').replace(/\s+/g,' ').trim();
+  return !t || NO_ASD_RX.test(t);
+}
+
+function getASDCanonicalName(asdName){
+  if(!asdName)return asdName;
+  return ASD_CANON[asdName]||asdName;
+}
+
+// ── GRUPPI ASD IGNORATI (falsi positivi) ─────────────────────
+// Alcuni gruppi rilevati come "simili" sono in realtà ASD diverse
+// (es. "ASD Hills Nordic Walking" vs "ASD Outdoor Nordic & Walking").
+// Non potendo essere unificati, verrebbero riproposti all'infinito:
+// l'utente può marcarli come ignorati e non li rivedrà più.
+function asdGroupKey(members){
+  return members.slice().sort().join('||');
+}
+function getIgnoredASDGroups(){
+  try{return JSON.parse(localStorage.getItem('nws2027demo_asd_groups_ignored')||'[]');}catch(e){return [];}
+}
+function saveIgnoredASDGroups(list){
+  try{localStorage.setItem('nws2027demo_asd_groups_ignored',JSON.stringify(list));}catch(e){}
+}
+function ignoreASDGroup(idx){
+  var g=_asdGroups[idx];if(!g)return;
+  var key=asdGroupKey(g.members);
+  var list=getIgnoredASDGroups();
+  if(list.indexOf(key)<0){list.push(key);saveIgnoredASDGroups(list);}
+  renderASD();
+}
+function resetIgnoredASDGroups(){
+  if(!confirm('Mostrare di nuovo tutti i gruppi ignorati?'))return;
+  saveIgnoredASDGroups([]);
+  renderASD();
+}
+
+function renderASD(){
+  var el=document.getElementById('v-asd');
+  var allASD=getAllASD();
+  var nd=allASD.filter(function(a){return getASDCircuito(a)==='nd';});
+  var assigned=allASD.filter(function(a){return getASDCircuito(a)!=='nd';});
+  _asdGroups=detectASDGroups();
+
+  var cirOpts=function(a){
+    var v=getASDCircuito(a);
+    return ['nd','nord','cs','sic','tutti'].map(function(c){
+      var labels={nd:'— Non assegnata —',nord:'Circuito Nord',cs:'Centro-Sud',sic:'Sicilia',tutti:'Tutti i circuiti'};
+      return '<option value="'+c+'"'+(v===c?' selected':'')+'>'+labels[c]+'</option>';
+    }).join('');
+  };
+
+  var rows=function(list){
+    return list.map(function(a){
+      var canonVal=getASDCanonicalName(a);if(canonVal===a)canonVal='';
+      return '<tr><td style="padding:8px 12px;font-size:13px;word-break:break-word;max-width:200px">'+a+'</td>'+
+        '<td style="padding:8px 12px"><select class="asd-sel" data-asd="'+a.replace(/"/g,'&quot;')+'" style="padding:6px 10px;border-radius:6px;border:1px solid var(--brd);background:var(--s2);color:var(--tx);font-size:12px" onchange="onASDChange(this)">'+cirOpts(a)+'</select></td>'+
+        '<td style="padding:8px 12px"><input type="text" value="'+canonVal.replace(/"/g,'&quot;')+'" placeholder="Nome canonico…" data-asd="'+a.replace(/"/g,'&quot;')+'" style="padding:5px 8px;border-radius:6px;border:1px solid var(--brd);background:var(--s2);color:var(--tx);font-size:11px;width:170px" onblur="onASDCanonChange(this)" onkeydown="if(event.key===\'Enter\')this.blur()"></td>'+
+        '<td style="padding:8px 12px"><button class="btn bg bsm" onclick="searchASD(this)" data-asd-search="'+a.replace(/"/g,'&quot;')+'" title="Cerca su web">🔍</button></td></tr>';
+    }).join('');
+  };
+
+  var hasCanonicals=Object.keys(ASD_CANON).some(function(k){return ASD_CANON[k]&&ASD_CANON[k]!==k;});
+  var resetBtn=hasCanonicals?'<button class="btn bg bsm" style="color:var(--red);border-color:var(--red)" onclick="resetAllCanonicals(this)">&#x274C; Reimposta tutti i canonici</button>':'';
+  var nIgnored=getIgnoredASDGroups().length;
+  var unignoreBtn=nIgnored?'<button class="btn bg bsm" onclick="resetIgnoredASDGroups()">&#x1F441;&#xFE0F; Mostra gruppi ignorati ('+nIgnored+')</button>':'';
+  var suggestHtml='';
+  if(_asdGroups.length){
+    var gItems=_asdGroups.map(function(g,idx){
+      return '<div style="padding:10px;background:var(--s2);border-radius:8px;margin-bottom:8px">'+
+        '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">'+
+        '<input type="text" id="asd-grp-'+idx+'" value="'+g.canonical.replace(/"/g,'&quot;')+'" style="flex:1;padding:6px 8px;border-radius:6px;border:1px solid var(--brd);background:var(--bg);color:var(--tx);font-size:13px;font-weight:600">'+
+        '<button class="btn bg bsm" onclick="applyASDGroup('+idx+',this)">Applica</button>'+
+        '<button class="btn bg bsm" style="color:var(--tx3)" title="Non sono la stessa ASD: non mostrare più questo gruppo" onclick="ignoreASDGroup('+idx+')">&#x2715; Ignora</button></div>'+
+        '<div style="font-size:11px;color:var(--tx3);line-height:1.6">'+g.members.join(' &bull; ')+'</div></div>';
+    }).join('');
+    suggestHtml='<div class="card" style="margin-bottom:16px;border-color:#60a5fa">'+
+      '<div class="ct" style="color:#1d4ed8">&#x1F517; Nomi simili rilevati ('+_asdGroups.length+' gruppi)</div>'+
+      '<p style="font-size:12px;color:var(--tx2);margin-bottom:12px">Verifica il nome canonico e applica per unificare le varianti. Se sono <strong>ASD diverse</strong>, usa &laquo;Ignora&raquo; per non rivederle.</p>'+
+      '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px"><button class="btn bp bsm" onclick="applyAllASDGroups(this)">&#x26A1; Applica tutti</button>'+resetBtn+unignoreBtn+'</div>'+
+      gItems+'</div>';
+  } else if(hasCanonicals||nIgnored){
+    suggestHtml='<div class="card" style="margin-bottom:16px;border-color:rgba(52,211,153,.3)"><div class="ct">&#x2705; Nessun gruppo da verificare</div><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">'+resetBtn+unignoreBtn+'</div></div>';
+  }
+
+  el.innerHTML='<h2 style="font-family:var(--fh);font-weight:800;font-size:28px;margin-bottom:8px">GESTIONE <span style="color:var(--grn)">ASD</span></h2>'+
+    '<p style="color:var(--tx2);font-size:13px;margin-bottom:20px">Assegna ogni ASD al circuito di appartenenza. Le classifiche filtreranno automaticamente.</p>'+
+    suggestHtml+
+    (nd.length?'<div class="card" style="margin-bottom:16px;border-left:3px solid var(--yel)">'+
+      '<div class="ct" style="color:var(--yel)">&#x26A0;&#xFE0F; Non assegnate ('+nd.length+')</div>'+
+      '<div class="tw"><table width="100%"><thead><tr><th>Nome OCR</th><th>Circuito</th><th>Nome canonico</th><th></th></tr></thead><tbody>'+rows(nd)+'</tbody></table></div></div>':'<div class="al ao" style="margin-bottom:16px">&#x2705; Tutte le ASD sono state assegnate!</div>')+
+    (assigned.length?'<div class="card"><div class="ct">&#x2705; Assegnate ('+assigned.length+')</div>'+
+      '<div class="tw"><table width="100%"><thead><tr><th>Nome OCR</th><th>Circuito</th><th>Nome canonico</th><th></th></tr></thead><tbody>'+rows(assigned)+'</tbody></table></div></div>':'');
+}
+
+function onASDChange(sel){
+  var asd=sel.dataset.asd;
+  var circ=sel.value;
+  saveASDCircuito(asd,circ).then(function(){
+    var allASD=getAllASD();
+    var nd=allASD.filter(function(a){return getASDCircuito(a)==='nd';});
+    var el=document.querySelector('#v-asd .ct');
+    if(el&&el.textContent.includes('Non assegnate')) el.textContent='⚠️ Non assegnate ('+nd.length+')';
+  });
+}
+
+function onASDCanonChange(input){
+  var asd=input.dataset.asd;
+  var canon=input.value.trim();
+  saveASDCanonical(asd, canon||null);
+}
+
+function detectASDGroups(){
+  var all=getAllASD();
+  function normASD(s){
+    return s.toLowerCase().replace(/['''`]/g,'').replace(/[^a-z0-9\s]/g,' ').replace(/\s+/g,' ').trim();
+  }
+  var STOP=['asd','aps','nw','nordic','walking','sport','club','team','del','di','da','le','la'];
+  // FIX 7: asdSim non ripiega più sulla similarità grezza (lev) quando non ci sono
+  // abbastanza parole significative in comune. Prima, nomi brevi con lo stesso prefisso
+  // generico (es. "ASD Atletica Gorizia" / "ASD Atletica Cibeno") potevano superare la
+  // soglia di unione (0.5) solo per la somiglianza letterale, fondendo per errore ASD
+  // completamente diverse. Ora, sotto soglia 0.70 di somiglianza letterale, l'unione
+  // avviene SOLO se condividono almeno 2 parole distintive con Jaccard >=0.5; altrimenti 0.
+  function asdSim(a,b){
+    var na=normASD(a),nb=normASD(b);
+    var lev=similarity(na,nb);
+    if(lev>=0.70)return lev;
+    var wa=na.split(' ').filter(function(w){return w.length>=3&&STOP.indexOf(w)<0;});
+    var wb=nb.split(' ').filter(function(w){return w.length>=3&&STOP.indexOf(w)<0;});
+    if(!wa.length||!wb.length)return 0;
+    var wbSet={};wb.forEach(function(w){wbSet[w]=true;});
+    var common=wa.filter(function(w){return wbSet[w];}).length;
+    if(common<2)return 0; // almeno 2 parole significative in comune per evitare falsi positivi
+    var jac=common/(wa.length+wb.length-common);
+    return jac>=0.5?jac:0;
+  }
+  var parent={};
+  all.forEach(function(a){parent[a]=a;});
+  function find(a){if(parent[a]!==a)parent[a]=find(parent[a]);return parent[a];}
+  function unite(a,b){var ra=find(a),rb=find(b);if(ra!==rb)parent[ra]=rb;}
+  for(var i=0;i<all.length;i++){
+    for(var j=i+1;j<all.length;j++){
+      var ai=all[i],aj=all[j];
+      var ci=getASDCircuito(ai),cj=getASDCircuito(aj);
+      if(ci!=='nd'&&cj!=='nd'&&ci!==cj)continue;
+      if(asdSim(ai,aj)>=0.5)unite(ai,aj);
+    }
+  }
+  var gMap={};
+  all.forEach(function(a){var r=find(a);if(!gMap[r])gMap[r]=[];gMap[r].push(a);});
+  var ignored=getIgnoredASDGroups();
+  return Object.values(gMap).filter(function(g){
+    if(g.length<=1)return false;
+    // FIX 8: nascondi i gruppi GIÀ unificati — se tutti i membri puntano già allo stesso
+    // nome canonico, il problema è risolto e non ha senso continuare a segnalarlo.
+    var canons=g.map(function(a){return getASDCanonicalName(a);});
+    var allSame=canons.every(function(c){return c===canons[0];});
+    if(allSame)return false;
+    // FIX 9: nascondi i gruppi marcati come falsi positivi dall'utente
+    if(ignored.indexOf(asdGroupKey(g))>=0)return false;
+    return true;
+  }).map(function(g){
+    // Prefer already-set canonical; then prefer mixed-case over ALL-CAPS; then longest
+    var existCanon=null;
+    g.forEach(function(a){var c=ASD_CANON[a];if(c&&c!==a&&!existCanon)existCanon=c;});
+    var canon=existCanon||g.reduce(function(best,a){
+      var bCaps=best===best.toUpperCase(),aCaps=a===a.toUpperCase();
+      if(bCaps&&!aCaps)return a;if(!bCaps&&aCaps)return best;
+      return a.length>best.length?a:best;
+    },g[0]);
+    return {canonical:canon,members:g.slice().sort()};
+  });
+}
+
+async function applyASDGroup(idx,btn){
+  var g=_asdGroups[idx];if(!g)return;
+  var inp=document.getElementById('asd-grp-'+idx);
+  var canon=inp?inp.value.trim():g.canonical;
+  if(!canon)return;
+  if(btn){btn.textContent='…';btn.disabled=true;}
+  for(var k=0;k<g.members.length;k++){
+    if(g.members[k]!==canon)await saveASDCanonical(g.members[k],canon);
+  }
+  renderASD();
+}
+
+async function applyAllASDGroups(btn){
+  if(btn){btn.textContent='…';btn.disabled=true;}
+  for(var i=0;i<_asdGroups.length;i++){
+    var inp=document.getElementById('asd-grp-'+i);
+    var canon=inp?inp.value.trim():_asdGroups[i].canonical;
+    if(!canon)continue;
+    var g=_asdGroups[i];
+    for(var k=0;k<g.members.length;k++){
+      if(g.members[k]!==canon)await saveASDCanonical(g.members[k],canon);
+    }
+  }
+  renderASD();
+}
+
+async function resetAllCanonicals(btn){
+  if(!confirm('Cancellare tutti i nomi canonici? I raggruppamenti manuali andranno persi.'))return;
+  if(btn){btn.textContent='…';btn.disabled=true;}
+  var all=getAllASD();
+  for(var i=0;i<all.length;i++){await saveASDCanonical(all[i],null);}
+  renderASD();
+}
+
+function searchASD(btn){
+  var asd=btn.dataset.asdSearch||'';
+  var q=encodeURIComponent(asd+' Nordic Walking circuito');
+  window.open('https://www.google.com/search?q='+q,'_blank');
+}
+
+function renderSettings(){
+  var el=document.getElementById('v-settings');
+  var anomalies=detectAllAnomalies().concat(detectRepeatedNameAnomalies());
+  var anomHtml='';
+  if(anomalies.length){
+    anomHtml='<div class="card" style="margin-bottom:16px;border-color:#fbbf24"><div class="ct" style="color:#92400e">&#x26A0;&#xFE0F; Anomalie rilevate ('+anomalies.length+')</div><p style="color:var(--tx2);font-size:12px;margin-bottom:12px">Nomi simili che potrebbero essere duplicati. Correggi manualmente caricando di nuovo la classifica o ignora i falsi positivi.</p>';
+    anomalies.forEach(function(a){
+      var desc=a.isRepeat?'Parola ripetuta nel nome':(Math.round(a.score*100)+'% simile');
+      var names=a.isRepeat
+        ?('<span style="color:var(--tx)">'+a.name1+'</span>')
+        :('<span style="color:var(--tx)">'+a.name1+'</span> &harr; <span style="color:var(--tx)">'+a.name2+'</span>');
+      var n2esc=a.isRepeat?'__repeat__':a.name2.replace(/\'/g,"\\'").replace(/"/g,'&quot;');
+      var e1=a.name1.replace(/\'/g,"\\'").replace(/"/g,'&quot;');
+      var merge=a.isRepeat?'':
+        '<button class="btn bg bsm" style="border-color:var(--grn);color:var(--grn)" onclick="mergeAnomalyAndRefresh(\''+e1+'\',\''+n2esc+'\',this)">&#x1F517; Tieni il primo</button>'+
+        '<button class="btn bg bsm" style="border-color:var(--grn);color:var(--grn)" onclick="mergeAnomalyAndRefresh(\''+n2esc+'\',\''+e1+'\',this)">&#x1F517; Tieni il secondo</button>';
+      anomHtml+='<div style="padding:10px;background:#fff7e6;border-radius:6px;margin-bottom:8px;font-size:13px"><div style="font-weight:600;color:#92400e">'+a.cat+' &mdash; '+desc+'</div><div style="margin:6px 0">'+names+'</div><div style="display:flex;gap:6px;flex-wrap:wrap">'+merge+'<button class="btn bg bsm" onclick="ignoreAnomalyAndRefresh(\''+e1+'\',\''+n2esc+'\')">Ignora</button></div></div>';
+    });
+    anomHtml+='</div>';
+  } else {
+    anomHtml='<div class="al ao" style="margin-bottom:16px">&#x2705; Nessuna anomalia rilevata</div>';
+  }
+  el.innerHTML='<div style="max-width:600px"><h2 style="font-family:var(--fh);font-weight:800;font-size:28px;margin-bottom:20px">&#x2699;&#xFE0F; <span style="color:var(--sic)">IMPOSTAZIONI</span></h2><div class="card" style="margin-bottom:16px;border-color:rgba(52,211,153,.3)"><div class="ct">&#x1F916; Motore OCR</div><p style="color:var(--tx2);font-size:13px">OCR tramite <strong>Gemini AI</strong> via Supabase Edge Function, con <strong>doppia lettura</strong> su due modelli e controllo aritmetico Punti/Totale &mdash; nessuna API key da configurare nell\'app.</p></div><div class="card" style="margin-bottom:16px"><div class="ct">&#x1F3C3; ASD da evidenziare</div><div class="fg"><label>Nome ASD (ricerca parziale)</label><input type="text" id="set-asd" value="'+(DB.settings.asdHighlight||'')+'" placeholder="es. Sile Walking"></div></div><button class="btn bp" onclick="saveSettings()">&#x1F4BE; Salva impostazioni</button><div class="div"></div>'+buildAtletiCanonBox()+anomHtml+'<div class="card" style="border-color:rgba(230,51,41,.3)"><div class="ct" style="color:var(--red2)">&#x26A0;&#xFE0F; Gestione dati</div><p style="color:var(--tx2);font-size:13px;margin-bottom:16px">Database: <strong>'+Object.keys(DB.results).length+' classifiche</strong> salvate.</p><div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn bs2" onclick="expFullDB()">&#x1F4CA; Export completo DB</button><button class="btn bg" style="color:var(--red);border-color:var(--red)" onclick="confirmReset()">&#x1F5D1;&#xFE0F; Cancella tutti i dati</button></div></div></div>';
+}
+
+function saveSettings(){
+  DB.settings.asdHighlight=document.getElementById('set-asd').value.trim();
+  saveSettings2();
+  var btn=document.querySelector('#v-settings .btn.bp');
+  if(btn){btn.textContent='Salvato!';setTimeout(function(){btn.textContent='Salva impostazioni';},2000);}
+}
+
+function ignoreAnomalyAndRefresh(n1,n2){
+  ignoreAnomaly(n1,n2);
+  renderSettings();
+}
+
+function confirmReset(){if(confirm('Cancellare tutti i dati? Operazione non reversibile.')){deleteAllResults().then(function(){renderSettings();});}}
+
+function expCSV(){
+  var cir=clState.circuit,cat=clState.cat;
+  if(clState.showASD){
+    var cA=asdCircAOA(cir);
+    var nA=asdNatAOA();
+    if(cA.length<2&&nA.length<2){alert('Nessun dato ASD da esportare.');return;}
+    var L=['CLASSIFICA ASD - '+CIR[cir].name];
+    cA.forEach(function(r){L.push(r.join(';'));});
+    if(nA.length>1){
+      L.push('');
+      L.push('CLASSIFICA NAZIONALE A SQUADRE');
+      nA.forEach(function(r){L.push(r.join(';'));});
+    }
+    var bl=new Blob([L.join('\n')],{type:'text/csv;charset=utf-8;'});
+    var an=document.createElement('a');an.href=URL.createObjectURL(bl);an.download=expFilename('csv');an.click();
+    return;
+  }
+  var rows=getStandings(cir,cat);
+  var lines=[['POS','Atleta/Coppia','ASD','Tappe','Totale'].join(';')];
+  rows.forEach(function(r){lines.push([r.pos,r.display,r.assoc,r.stages.length,r.total].join(';'));});
+  var blob=new Blob([lines.join('\n')],{type:'text/csv;charset=utf-8;'});
+  var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=expFilename('csv');a.click();
+}
+
+function expXLS(){
+  var cir=clState.circuit,cat=clState.cat;
+  if(clState.showASD){
+    if(typeof XLSX==='undefined'){alert('Libreria Excel non disponibile.');return;}
+    var wbA=XLSX.utils.book_new();
+    var d1=asdCircAOA(cir);
+    if(d1.length>1)XLSX.utils.book_append_sheet(wbA,XLSX.utils.aoa_to_sheet(d1),shName('ASD '+CIR[cir].name));
+    var d2=asdNatAOA();
+    if(d2.length>1)XLSX.utils.book_append_sheet(wbA,XLSX.utils.aoa_to_sheet(d2),'ASD Nazionale');
+    if(!wbA.SheetNames.length){alert('Nessun dato da esportare.');return;}
+    XLSX.writeFile(wbA,expFilename('xlsx'));
+    return;
+  }
+  var rows=getStandings(cir,cat);
+  var catObj=CATS.find(function(c){return c.id===cat;});
+  var stgs=STAGES.filter(function(s){return s.circuits.indexOf(cir)>=0&&s.id!=='san-dona';});
+  var data=[['POS','Atleta/Coppia','ASD','Tappe','Totale'].concat(stgs.map(function(s){return s.name+(s.jollyFor.indexOf(cir)>=0?'(J)':'');}))];
+  rows.forEach(function(r){var spts=stgs.map(function(s){var sp=null;for(var k=0;k<r.stages.length;k++){if(r.stages[k].stageId===s.id){sp=r.stages[k];break;}}return sp?sp.ptsUsed:'';});data.push([r.pos,r.display,r.assoc,r.stages.length,r.total].concat(spts));});
+  var wb=XLSX.utils.book_new();var ws=XLSX.utils.aoa_to_sheet(data);XLSX.utils.book_append_sheet(wb,ws,catObj.name.substring(0,31));XLSX.writeFile(wb,expFilename('xlsx'));
+}
+
+function expFilename(ext){
+  var cirName=CIR[clState.circuit].name.replace(/\s/g,'-').replace(/[^\w-]/g,'');
+  var catLabel;
+  if(clState.showASD){
+    catLabel='Classifica-ASD';
+  } else {
+    var catObj=CATS.find(function(c){return c.id===clState.cat;});
+    catLabel=catObj?catObj.name.replace(/\s/g,'-').replace(/[^\w-]/g,''):'';
+  }
+  var date=new Date().toISOString().split('T')[0];
+  return 'NWS2026_'+cirName+'_'+catLabel+'_'+date+'.'+ext;
+}
+
+/* ---- EXPORT IMMAGINE / PDF -------------------------------------------
+   Il rendering NON usa più l'elemento a schermo (che su mobile viene
+   schiacciato e produce testo illeggibile): il contenuto viene clonato in
+   un contenitore fuori schermo di larghezza fissa, così l'export è identico
+   da telefono e da PC. Oltre le 25 righe la classifica viene divisa in più
+   parti, ognuna con intestazione, titolo e nota ripetuti.               */
+var EXP_WIDTH=1400;      // larghezza di rendering in px (PDF, A4 orizzontale)
+var EXP_IMG_WIDTH=1080;  // larghezza di impaginazione immagini PNG: formato verticale, colonne compatte
+var EXP_IMG_OUT=2048;    // larghezza finale in pixel dei PNG: quella usata da Facebook, cosi' non li ridimensiona
+var EXP_SCALE=3;         // moltiplicatore di risoluzione
+var EXP_ROWS_PER_PAGE=22;// righe per parte (PDF)
+var EXP_IMG_ROWS=35;     // max righe per immagine PNG (parti bilanciate, formato verticale)
+
+/* Divide il contenuto da esportare in "parti".
+   Se dentro #exp-wrap ci sono blocchi .expblk (vista Classifica ASD: una tabella
+   per il circuito e una nazionale) ogni blocco viene esportato per conto suo, cosi'
+   le righe di una tabella non finiscono mai mescolate con quelle dell'altra.
+   Senza .expblk il comportamento e' identico a prima. */
+function splitRows(n,extra,per){
+  per=per||EXP_ROWS_PER_PAGE;
+  var out=[];
+  if(n<=per+3){out.push(Object.assign({part:1,parts:1},extra||{}));return out;}
+  var tot=Math.ceil(n/per),p=0;
+  per=Math.ceil(n/tot); /* parti bilanciate: niente ultima immagine con 3-4 righe */
+  for(var i=0;i<n;i+=per){
+    p++;
+    out.push(Object.assign({a:i,b:Math.min(i+per,n),part:p,parts:tot},extra||{}));
+  }
+  return out;
+}
+
+function expChunks(per){
+  var el=document.getElementById('exp-wrap');
+  if(!el)return null;
+  var blks=el.querySelectorAll('.expblk');
+  if(blks.length){
+    var out=[];
+    for(var b=0;b<blks.length;b++){
+      var tb=blks[b].querySelector('table');
+      var nb=tb?tb.querySelectorAll('tbody tr').length:0;
+      if(!nb)continue;
+      out=out.concat(splitRows(nb,{blk:b,lab:blks[b].getAttribute('data-exp')||('blocco'+(b+1))},per));
+    }
+    return out.length?out:null;
+  }
+  var tbl=el.querySelector('table');
+  if(!tbl)return [null];
+  var n=tbl.querySelectorAll('tbody tr').length;
+  if(n<=(per||EXP_ROWS_PER_PAGE)+3)return [null];
+  return splitRows(n,null,per);
+}
+
+function expRender(ck,part,total,opt){
+  opt=opt||{};
+  var W=opt.width||EXP_WIDTH;
+  return new Promise(function(resolve,reject){
+    var src=document.getElementById('exp-wrap');
+    if(!src){reject(new Error('exp-wrap assente'));return;}
+    var host=document.createElement('div');
+    host.style.cssText='position:fixed;left:-20000px;top:0;width:'+W+'px;background:#fff;padding:'+(opt.compact?16:24)+'px;box-sizing:border-box;z-index:-1';
+    var clone=src.cloneNode(true);
+    clone.style.width='100%';
+    /* tiene solo il blocco richiesto, se il contenuto e' diviso in blocchi */
+    if(ck&&ck.blk!=null){
+      var bs=Array.prototype.slice.call(clone.querySelectorAll('.expblk'));
+      bs.forEach(function(d,ix){if(ix!==ck.blk&&d.parentNode)d.parentNode.removeChild(d);});
+    }
+    Array.prototype.slice.call(clone.querySelectorAll('.tw')).forEach(function(w){
+      w.style.overflow='visible';w.style.overflowX='visible';
+    });
+    Array.prototype.slice.call(clone.querySelectorAll('table')).forEach(function(t){
+      t.style.minWidth='0';
+    });
+    /* la colonna fissa (sticky) serve solo a video: html2canvas la disegna fuori posto */
+    Array.prototype.slice.call(clone.querySelectorAll('th,td')).forEach(function(c){
+      if(c.style.position==='sticky'){c.style.position='static';c.style.minWidth='0';c.style.background='transparent';}
+    });
+    if(ck&&ck.a!=null){
+      var tb0=clone.querySelector('table');
+      if(tb0){
+        var trs=Array.prototype.slice.call(tb0.querySelectorAll('tbody tr'));
+        trs.forEach(function(tr,i){if(i<ck.a||i>=ck.b)tr.parentNode.removeChild(tr);});
+      }
+      var pN=ck.part||part,pT=ck.parts||total;
+      var blkEl=clone.querySelector('.expblk');
+      var ttl=blkEl?blkEl.querySelector('div'):clone.querySelector('span');
+      if(ttl)ttl.textContent=ttl.textContent+'  ·  parte '+pN+'/'+pT+'  ('+(ck.a+1)+'\u2013'+ck.b+')';
+    }
+    host.appendChild(clone);
+    document.body.appendChild(host);
+    if(opt.compact)expCompact(clone);
+    html2canvas(host,{backgroundColor:'#ffffff',scale:(opt.outWidth?opt.outWidth/W:EXP_SCALE),width:W,windowWidth:W}).then(function(canvas){
+      if(host.parentNode)host.parentNode.removeChild(host);
+      resolve(canvas);
+    }).catch(function(e){
+      if(host.parentNode)host.parentNode.removeChild(host);
+      reject(e);
+    });
+  });
+}
+
+/* Stile compatto per le immagini verticali: colonne strette, testo su una riga,
+   ASD abbreviata con i puntini se troppo lunga. Agisce solo sulla copia da esportare. */
+function expCompact(root){
+  var st=document.createElement('style');
+  st.textContent=
+    '.card{padding:14px!important}'+
+    'table{font-size:13px!important}'+
+    'thead th{padding:7px 3px!important;font-size:9.5px!important;letter-spacing:.2px!important}'+
+    'tbody td{padding:6px 3px!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}'+
+    'table.tcomp tbody td:nth-child(2){padding-left:6px!important;padding-right:4px!important;font-size:13px!important}'+
+    'table.tcomp tbody td:nth-child(3){padding-left:4px!important;padding-right:4px!important;font-size:10.5px!important}'+
+    'table.tcomp thead th:nth-child(2),table.tcomp thead th:nth-child(3){padding-left:6px!important;padding-right:4px!important}'+
+    '.pb{width:22px!important;height:22px!important;font-size:12px!important}'+
+    '.pts{font-size:14px!important}';
+  root.insertBefore(st,root.firstChild);
+  /* colonne della classifica individuale/coppie ricalibrate per 1080 px */
+  Array.prototype.slice.call(root.querySelectorAll('table.tcomp')).forEach(function(t){
+    var cols=t.querySelectorAll('col');
+    if(cols.length<6)return;
+    var nStg=cols.length-5, stgW=(40/nStg).toFixed(2);
+    var w=['8%','25%','17%','4%'];
+    for(var i=0;i<cols.length;i++){
+      cols[i].style.width=i<4?w[i]:(i===cols.length-1?'6%':stgW+'%');
+    }
+  });
+}
+
+function expImg(){
+  if(typeof html2canvas==='undefined'){alert('Libreria immagine non disponibile.');return;}
+  var chunks=expChunks(EXP_IMG_ROWS);
+  if(!chunks||!chunks.length){alert('Niente da esportare: la classifica e\' vuota.');return;}
+  var base=expFilename('png').replace(/\.png$/,'');
+  var items=[];
+  expImgPanel(null,chunks.length);
+  var i=0;
+  function step(){
+    if(i>=chunks.length){expImgPanel(items,chunks.length);return;}
+    expRender(chunks[i],i+1,chunks.length,{width:EXP_IMG_WIDTH,compact:true,outWidth:EXP_IMG_OUT}).then(function(canvas){
+      var ck=chunks[i]||{};
+      var suf=(ck.lab?'_'+ck.lab:'');
+      if(ck.parts>1)suf+='_parte'+ck.part+'di'+ck.parts;
+      else if(!ck.lab&&chunks.length>1)suf='_parte'+(i+1)+'di'+chunks.length;
+      var label=(ck.lab?ck.lab+' ':'')+(ck.parts>1?'parte '+ck.part+'/'+ck.parts+' ('+(ck.a+1)+'–'+ck.b+')':(chunks.length>1&&!ck.lab?'parte '+(i+1):''));
+      items.push({name:base+suf+'.png',label:label||'Classifica',url:canvas.toDataURL('image/png'),canvas:canvas});
+      i++;
+      expImgPanel(items.length,chunks.length,true);
+      setTimeout(step,50);
+    }).catch(function(e){console.error('Export immagine:',e);expImgClose();alert('Errore durante l\'export immagine.');});
+  }
+  step();
+}
+
+/* Pannello immagini: ogni parte ha il suo pulsante "Scarica" (un clic = un download,
+   quindi il browser non blocca nulla) e, se il telefono lo consente, "Condividi". */
+/* ── IMMAGINI FINALISTI ──────────────────────────────────────
+   Per il circuito selezionato nel tab Finalissima: una immagine per categoria
+   con i soli qualificati. Se l'ultimo posto utile e' a pari merito, entrano
+   tutti i pari merito con l'avviso "spareggio in attesa". */
+function finalistiRows(cirId,catId){
+  var rows=getStandings(cirId,catId);
+  var qlim=QLIM[cirId]?QLIM[cirId][catId]||QLIM[cirId].def:10;
+  if(!rows.length)return {rows:[],qlim:qlim,tie:false};
+  if(rows.length<=qlim)return {rows:rows.map(function(r){return {r:r,tie:false,pos:r.pos};}),qlim:qlim,tie:false};
+  var last=rows[qlim-1], next=rows[qlim];
+  var cut=last.total;
+  var tie=next.total===cut&&(next.bestVoto||0)===(last.bestVoto||0);      /* pari anche dopo lo spareggio */
+  var decided=!tie&&next.total===cut;                                     /* pari punti risolto dal voto */
+  var out=[],firstTie=null;
+  rows.forEach(function(r,i){
+    if(i<qlim||(tie&&r.total===cut&&(r.bestVoto||0)===(last.bestVoto||0))){
+      var t=tie&&r.total===cut&&(r.bestVoto||0)===(last.bestVoto||0);
+      if(t&&firstTie===null)firstTie=r.pos;
+      out.push({r:r,tie:t,pos:t?firstTie:r.pos}); /* i pari merito mostrano la stessa posizione */
+    }
+  });
+  return {rows:out,qlim:qlim,tie:tie,decided:decided?{inR:last,outR:next}:null};
+}
+function finalistiHtml(cirId,cat,withStages){
+  var f=finalistiRows(cirId,cat.id);
+  if(!f.rows.length)return null;
+  var isCop=cat.type==='cop', col=CIR[cirId].color;
+  var stgs=withStages?STAGES.filter(function(s){return s.circuits.indexOf(cirId)>=0&&s.id!=='san-dona';}):[];
+  var nS=stgs.length;
+  /* larghezze: senza tappe nome/ASD larghi; con tappe si stringono */
+  var wPos=nS?6:8, wName=nS?29:50, wAsd=nS?19:30, wTot=nS?8:12;
+  var wStg=nS?((100-wPos-wName-wAsd-wTot)/nS).toFixed(2):0;
+  var fsName=nS?13:15, fsAsd=nS?11:12;
+  var th='font-size:10px;padding:8px 4px';
+  var stgHead=stgs.map(function(s){
+    var j=s.jollyFor.indexOf(cirId)>=0;
+    return '<th style="'+th+';text-align:center;white-space:nowrap">'+s.name.replace(/\s*\(.*\)/,'').substring(0,8).toUpperCase()+(isTappaItalia(s.id)?'<br><span style="color:#888">TI</span>':'')+(j?'<br><span style="color:var(--red2)">J&times;2</span>':'')+'</th>';
+  }).join('');
+  var body=f.rows.map(function(x){
+    var r=x.r;
+    var stgCells=stgs.map(function(s){
+      var sp=null;for(var k=0;k<r.stages.length;k++){if(r.stages[k].stageId===s.id){sp=r.stages[k];break;}}
+      return sp?'<td style="padding:8px 3px;text-align:center;font-size:12px;'+(sp.isJolly?'color:var(--red2);font-weight:700':'')+'">'+sp.ptsUsed+'</td>'
+               :'<td style="padding:8px 3px;text-align:center;color:#bbb">&mdash;</td>';
+    }).join('');
+    return '<tr style="border-bottom:1px solid #dde3ea">'+
+      '<td style="padding:9px 4px"><span class="pb p'+(x.pos<4?x.pos:'x')+'">'+x.pos+'</span></td>'+
+      '<td style="padding:9px 6px;font-weight:600;font-size:'+fsName+'px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+r.display+
+        (x.tie?' <span style="font-size:10px;font-weight:700;color:#b45309;background:#fef3c7;border-radius:4px;padding:1px 5px;margin-left:4px">PARI MERITO</span>':'')+'</td>'+
+      '<td style="padding:9px 4px;font-size:'+fsAsd+'px;color:#555;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(r.assoc||'')+'</td>'+
+      stgCells+
+      '<td style="padding:9px 4px;text-align:right;font-family:var(--fh);font-weight:700;font-size:17px;color:'+col+'">'+r.total+'</td>'+
+      '</tr>';
+  }).join('');
+  var cols='<col style="width:'+wPos+'%"><col style="width:'+wName+'%"><col style="width:'+wAsd+'%">'+stgs.map(function(){return '<col style="width:'+wStg+'%">';}).join('')+'<col style="width:'+wTot+'%">';
+  var fin=STAGES.find(function(s){return s.id==='san-dona';});
+  return '<div style="font-family:var(--fb);color:#111;background:#fff">'+
+    '<div style="font-family:var(--fh);font-weight:700;letter-spacing:2px;font-size:13px;color:var(--red)">NORDIC WALKING STYLE 2026 &middot; FINALISSIMA'+(fin?' &middot; '+fin.name.toUpperCase():'')+'</div>'+
+    '<div style="font-family:var(--fh);font-weight:800;font-size:30px;margin:4px 0 2px">'+cat.name.toUpperCase()+'</div>'+
+    '<div style="font-size:14px;color:#555;margin-bottom:14px">Qualificati '+CIR[cirId].name+' &middot; '+(isCop?'prime '+f.qlim+' coppie':((cat.id==='camminatore-f'||cat.id==='istruttore-f')?'prime ':'primi ')+f.qlim)+'</div>'+
+    '<table style="width:100%;table-layout:fixed;border-collapse:collapse">'+
+      '<colgroup>'+cols+'</colgroup>'+
+      '<thead><tr style="background:#eef1f5"><th style="'+th+';text-align:left">POS</th><th style="'+th+';text-align:left;padding-left:6px">'+(isCop?'COPPIA':'ATLETA')+'</th><th style="'+th+';text-align:left">ASD</th>'+stgHead+'<th style="'+th+';text-align:right">'+(nS?'TOTALE':'PUNTI')+'</th></tr></thead>'+
+      '<tbody>'+body+'</tbody></table>'+
+    (f.tie?'<div style="margin-top:10px;font-size:12px;color:#b45309">&#x26A0;&#xFE0F; Pari merito sull\'ultimo posto utile: spareggio in attesa di decisione del comitato.</div>':'')+
+    (f.decided?'<div style="margin-top:10px;font-size:12px;color:#555">Pari merito a '+f.decided.inR.total+' punti con '+f.decided.outR.display+': prevale il punteggio di tappa pi&ugrave; alto ('+f.decided.inR.bestVoto+' contro '+f.decided.outR.bestVoto+').</div>':'')+
+    '<div style="margin-top:8px;font-size:11px;color:#888">Punti circuito: somma di tutte le tappe (Jolly &times;2, Tappa Italia 100/99/98&hellip;)'+(nS?' &middot; &mdash; = tappa non disputata':'')+'</div>'+
+    '</div>';
+}
+function expRenderHtml(html,W,outW){
+  return new Promise(function(resolve,reject){
+    var host=document.createElement('div');
+    host.style.cssText='position:fixed;left:-20000px;top:0;width:'+W+'px;background:#fff;padding:28px;box-sizing:border-box;z-index:-1';
+    host.innerHTML=html;
+    document.body.appendChild(host);
+    html2canvas(host,{backgroundColor:'#ffffff',scale:outW/W,width:W,windowWidth:W}).then(function(c){
+      if(host.parentNode)host.parentNode.removeChild(host);resolve(c);
+    }).catch(function(e){if(host.parentNode)host.parentNode.removeChild(host);reject(e);});
+  });
+}
+function expFinalistiImg(){
+  if(typeof html2canvas==='undefined'){alert('Libreria immagine non disponibile.');return;}
+  var cir=fnState.circuit;
+  var jobs=CATS.map(function(c){return {cat:c,html:finalistiHtml(cir,c,!!fnState.finStages)};}).filter(function(j){return j.html;});
+  if(!jobs.length){alert('Nessun finalista per '+CIR[cir].name+'.');return;}
+  var cn=CIR[cir].name.replace(/^Circuito\s+/,'').replace(/\s/g,'-').replace(/[^\w-]/g,'');
+  var items=[],i=0;
+  expImgPanel(0,jobs.length);
+  function step(){
+    if(i>=jobs.length){expImgPanel(items,jobs.length);return;}
+    var j=jobs[i];
+    expRenderHtml(j.html,EXP_IMG_WIDTH,EXP_IMG_OUT).then(function(canvas){
+      items.push({name:'NWS2026_Finalisti_'+cn+'_'+j.cat.name.replace(/\s/g,'-').replace(/[^\w-]/g,'')+'.png',label:j.cat.name,url:canvas.toDataURL('image/png'),canvas:canvas});
+      i++;expImgPanel(items.length,jobs.length,true);setTimeout(step,50);
+    }).catch(function(e){console.error('Immagini finalisti:',e);expImgClose();alert('Errore durante la creazione delle immagini.');});
+  }
+  step();
+}
+
+function expImgClose(){var o=document.getElementById('exp-img-ov');if(o&&o.parentNode)o.parentNode.removeChild(o);}
+function expImgPanel(items,total,progress){
+  var ov=document.getElementById('exp-img-ov');
+  if(!ov){
+    ov=document.createElement('div');ov.id='exp-img-ov';
+    ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:20px 12px';
+    ov.addEventListener('click',function(e){if(e.target===ov)expImgClose();});
+    document.body.appendChild(ov);
+  }
+  if(!Array.isArray(items)){
+    var done=typeof items==='number'?items:0;
+    ov.innerHTML='<div style="background:var(--bg);border-radius:12px;padding:20px;max-width:520px;width:100%;text-align:center;font-family:var(--fb)">Preparo le immagini&hellip; '+done+'/'+total+'</div>';
+    return;
+  }
+  var canShare=!!(navigator.canShare&&window.File);
+  var html='<div style="background:var(--bg);border-radius:12px;padding:16px;max-width:560px;width:100%;font-family:var(--fb)">'+
+    '<div style="display:flex;align-items:center;margin-bottom:12px"><strong style="font-family:var(--fh);font-size:18px">'+(items.length>1?items.length+' immagini pronte':'Immagine pronta')+'</strong>'+
+    '<button class="btn bg bsm" style="margin-left:auto" onclick="expImgClose()">Chiudi</button></div>'+
+    (items.length>1?'<p style="font-size:12px;color:var(--tx3);margin-bottom:12px">Scarica le parti una alla volta. Dal telefono puoi anche tenere premuto sull\'anteprima per salvarla.</p>':'');
+  items.forEach(function(it,ix){
+    html+='<div style="border:1px solid var(--brd);border-radius:10px;padding:10px;margin-bottom:10px">'+
+      '<div style="font-size:13px;font-weight:600;margin-bottom:8px">'+it.label+'</div>'+
+      '<img src="'+it.url+'" style="width:100%;border-radius:6px;border:1px solid var(--brd);display:block;margin-bottom:8px" alt="">'+
+      '<div style="display:flex;gap:8px;flex-wrap:wrap">'+
+      '<a class="btn bp bsm" style="text-decoration:none" href="'+it.url+'" download="'+it.name+'">&#x2B07;&#xFE0F; Scarica</a>'+
+      (canShare?'<button class="btn bs2 bsm" onclick="expImgShare('+ix+')">&#x1F4E4; Condividi</button>':'')+
+      '</div></div>';
+  });
+  html+='</div>';
+  ov.innerHTML=html;
+  ov._items=items;
+}
+function expImgShare(ix){
+  var ov=document.getElementById('exp-img-ov');if(!ov||!ov._items)return;
+  var it=ov._items[ix];
+  it.canvas.toBlob(function(b){
+    var f=new File([b],it.name,{type:'image/png'});
+    if(navigator.canShare&&navigator.canShare({files:[f]})){
+      navigator.share({files:[f],title:it.name}).catch(function(){});
+    }
+  },'image/png');
+}
+
+function expPDF(){
+  if(typeof html2canvas==='undefined'||typeof jspdf==='undefined'){alert('Libreria PDF non disponibile.');return;}
+  var chunks=expChunks();
+  if(!chunks||!chunks.length){alert('Niente da esportare: la classifica e\' vuota.');return;}
+  var pdfLib=jspdf;
+  var pdf=new pdfLib.jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
+  var w=pdf.internal.pageSize.getWidth();
+  var i=0;
+  function step(){
+    if(i>=chunks.length){pdf.save(expFilename('pdf'));return;}
+    expRender(chunks[i],i+1,chunks.length).then(function(canvas){
+      if(i>0)pdf.addPage();
+      pdf.addImage(canvas.toDataURL('image/png'),'PNG',0,0,w,canvas.height*w/canvas.width);
+      i++;
+      step();
+    }).catch(function(e){console.error('Export PDF:',e);alert('Errore durante l\'export PDF.');});
+  }
+  step();
+}
+
+/* Nome foglio Excel valido: max 31 caratteri, senza \ / ? * [ ] : */
+function shName(s){
+  return String(s==null?'':s).replace(/[\\\/\?\*\[\]:]/g,'-').substring(0,31);
+}
+
+/* Barra dei pulsanti di export, identica nelle classifiche individuali e in quella ASD */
+function expBar(){
+  return '<div class="eb">'+
+    '<button class="btn bg bsm" onclick="expCSV()">&#x1F4E5; CSV</button>'+
+    '<button class="btn bg bsm" onclick="expXLS()">&#x1F4CA; Excel</button>'+
+    '<button class="btn bg bsm" onclick="expImg()">&#x1F5BC;&#xFE0F; Immagine</button>'+
+    '<button class="btn bg bsm" onclick="expPDF()">&#x1F4C4; PDF</button>'+
+    '<button class="btn bg bsm" onclick="expDossierCircuito()" title="Tutte le categorie del circuito in un unico file Excel, un foglio per classifica">&#x1F4DA; Dossier circuito</button>'+
+    '<span style="margin-left:auto;font-size:12px;color:var(--tx3)"><span style="background:var(--red);width:10px;height:10px;display:inline-block;border-radius:2px;vertical-align:middle;margin-right:4px"></span>'+(DB.settings.asdHighlight||'')+'</span>'+
+    '</div>';
+}
+
+/* Una classifica di categoria in forma di matrice per Excel: intestazione + righe,
+   con una colonna per ogni tappa del circuito (J = tappa Jolly). */
+function catSheetData(cirId,catId){
+  var rows=getStandings(cirId,catId);
+  if(!rows.length)return null;
+  var cat=CATS.find(function(c){return c.id===catId;});
+  if(!cat)return null;
+  var stgs=STAGES.filter(function(s){return s.circuits.indexOf(cirId)>=0&&s.id!=='san-dona';});
+  var head=['POS',(cat.type==='cop'?'Coppia':'Atleta'),'ASD','Tappe']
+    .concat(stgs.map(function(s){return s.name+(s.jollyFor.indexOf(cirId)>=0?' (J)':'');}))
+    .concat(['TOTALE']);
+  var data=[head];
+  rows.forEach(function(r,i){
+    var sp=stgs.map(function(s){
+      var f=null;
+      for(var k=0;k<r.stages.length;k++){if(r.stages[k].stageId===s.id){f=r.stages[k];break;}}
+      return f?f.ptsUsed:'';
+    });
+    data.push([i+1,r.display,r.assoc,r.stages.length].concat(sp).concat([r.total]));
+  });
+  return data;
+}
+
+/* DOSSIER CIRCUITO — un unico .xlsx con un foglio per ogni classifica del circuito
+   selezionato: le 7 categorie, la classifica ASD di circuito e quella nazionale.
+   Le categorie senza dati non generano un foglio vuoto: vengono saltate. */
+function expDossierCircuito(){
+  if(typeof XLSX==='undefined'){alert('Libreria Excel non disponibile.');return;}
+  var cir=clState.circuit;
+  var wb=XLSX.utils.book_new();
+  CATS.forEach(function(c){
+    var d=catSheetData(cir,c.id);
+    if(!d)return;
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(d),shName(c.name));
+  });
+  var a1=asdCircAOA(cir);
+  if(a1.length>1)XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(a1),shName('ASD '+CIR[cir].name));
+  var a2=asdNatAOA();
+  if(a2.length>1)XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(a2),'ASD Nazionale');
+  if(!wb.SheetNames.length){alert('Nessun dato da esportare per '+CIR[cir].name+'.');return;}
+  var cn=CIR[cir].name.replace(/\s/g,'-').replace(/[^\w-]/g,'');
+  XLSX.writeFile(wb,'NWS2026_Dossier_'+cn+'_'+new Date().toISOString().split('T')[0]+'.xlsx');
+}
+
+/* DOSSIER FINALISSIMA — un unico .xlsx con un foglio per categoria; dentro ogni foglio
+   i tre circuiti uno sotto l'altro, ciascuno con la propria soglia di accesso e lo
+   stato di qualificazione riga per riga. */
+function expDossierFinalissima(){
+  if(typeof XLSX==='undefined'){alert('Libreria Excel non disponibile.');return;}
+  var wb=XLSX.utils.book_new();
+  var cirs=['nord','cs','sic'];
+  CATS.forEach(function(cat){
+    var data=[];
+    cirs.forEach(function(cid){
+      var rows=getStandings(cid,cat.id);
+      if(!rows.length)return;
+      var qlim=QLIM[cid]?(QLIM[cid][cat.id]||QLIM[cid].def):10;
+      if(data.length)data.push([]);
+      data.push([CIR[cid].name+'  \u2014  accesso: primi '+qlim]);
+      data.push(['POS',(cat.type==='cop'?'Coppia':'Atleta'),'ASD','Tappe','Totale','Finalissima']);
+      rows.forEach(function(r,i){
+        data.push([i+1,r.display,r.assoc,r.stages.length,r.total,
+          (i<qlim?'QUALIFICATO':'')]);
+      });
+    });
+    if(!data.length)return;
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(data),shName(cat.name));
+  });
+  if(!wb.SheetNames.length){alert('Nessun dato da esportare.');return;}
+  XLSX.writeFile(wb,'NWS2026_Finalissima_'+new Date().toISOString().split('T')[0]+'.xlsx');
+}
+
+function expFullDB(){
+  var wb=XLSX.utils.book_new();
+  Object.keys(DB.results).forEach(function(key){
+    var r=DB.results[key];
+    var st=STAGES.find(function(s){return s.id===r.stageId;});
+    var cat=CATS.find(function(c){return c.id===r.catId;});
+    if(!st||!cat)return;
+    var isCop=cat.type==='cop';
+    var hdr=isCop?['POS','P1','P2','ASD','Tot','Punti']:['POS','Cognome','Nome','ASD','Tot','Punti'];
+    var data=[hdr].concat(r.rows.map(function(row){return isCop?[row.pos,row.p1||'',row.p2||'',row.assoc||'',row.tot||'',row.pts||'']:[row.pos,row.cognome||'',row.nome||'',row.assoc||'',row.tot||'',row.pts||''];}));
+    var ws=XLSX.utils.aoa_to_sheet(data);XLSX.utils.book_append_sheet(wb,ws,(st.name+' '+cat.short).substring(0,31));
+  });
+  if(!wb.SheetNames.length){alert('Nessun dato da esportare');return;}
+  XLSX.writeFile(wb,'NWS2026_DB_'+new Date().toISOString().split('T')[0]+'.xlsx');
+}
+
+function fmtDT(iso){try{return new Date(iso).toLocaleString('it-IT',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});}catch(e){return iso;}}
+function fmtDs(iso){try{return new Date(iso).toLocaleDateString('it-IT',{day:'2-digit',month:'short'});}catch(e){return iso;}}
+
+loadSettings();
+Promise.all([loadAllResults(), loadASDMap(), loadAtletiCanon()]).then(function(){
+  if(PUBLIC_MODE){
+    ['t-upload','t-manuale','t-settings','t-asd'].forEach(function(id){
+      var el=document.getElementById(id);
+      if(el)el.style.display='none';
+    });
+    var banner=document.getElementById('public-banner');
+    if(banner)banner.style.display='flex';
+  }
+  renderDash();
+});
+if(false&&'serviceWorker' in navigator){   /* demo: niente cache offline */
+  navigator.serviceWorker.register('./sw.js').then(function(reg){
+    reg.addEventListener('updatefound',function(){
+      var nw=reg.installing;
+      nw.addEventListener('statechange',function(){
+        if(nw.state==='installed'&&navigator.serviceWorker.controller){
+          var t=document.getElementById('sw-toast');
+          if(t)t.style.display='flex';
+        }
+      });
+    });
+  });
+}
+</script>
+</body>
+</html>

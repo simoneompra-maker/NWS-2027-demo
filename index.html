@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>NW Style 2027 · demo</title>
+<link rel="icon" href="giuria/icon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;800&family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet">
+<style>
+/* Layout: una colonna di lettura, due porte d'ingresso affiancate, poi il percorso di prova numerato (è davvero una sequenza) */
+:root{--bg:#f3f4f1;--card:#ffffff;--ink:#16181a;--mute:#5d646b;--line:#dcdfdb;--red:#c8322a;--green:#2e7d4f;--warn-bg:#fff4d6;--warn-ink:#5c4100;
+  --fh:"Barlow Condensed","Arial Narrow",Arial,sans-serif;--fb:"Source Sans 3",system-ui,-apple-system,"Segoe UI",sans-serif;color-scheme:light}
+@media (prefers-color-scheme:dark){:root{--bg:#141618;--card:#1d2023;--ink:#eceeed;--mute:#a3a9ae;--line:#33383c;--red:#ef5b52;--green:#5cc28a;--warn-bg:#3a3018;--warn-ink:#f2d58c;color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.55 var(--fb)}
+main{max-width:860px;margin:0 auto;padding:28px 16px 60px}
+h1,h2{font-family:var(--fh);font-weight:800;letter-spacing:.5px;line-height:1.05;text-wrap:balance;margin:0}
+h1{font-size:44px}h1 span{color:var(--red)}
+h2{font-size:26px;margin-bottom:12px}
+.lead{color:var(--mute);max-width:62ch;margin:10px 0 0}
+.note{background:var(--warn-bg);color:var(--warn-ink);border-radius:10px;padding:10px 14px;font-size:15px;margin:22px 0}
+.doors{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px;margin:22px 0 34px}
+.door{display:flex;flex-direction:column;gap:6px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px;color:inherit;text-decoration:none}
+.door:hover,.door:focus-visible{border-color:var(--red);outline:none}
+.door b{font-family:var(--fh);font-size:24px;letter-spacing:.4px}.door small{color:var(--mute);font-size:15px}
+.door .go{color:var(--red);font-weight:600;margin-top:auto}
+ol.steps{list-style:none;counter-reset:s;padding:0;margin:0;display:grid;gap:10px}
+ol.steps li{counter-increment:s;display:grid;grid-template-columns:34px minmax(0,1fr);gap:10px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+ol.steps li::before{content:counter(s);font-family:var(--fh);font-weight:800;font-size:24px;color:var(--red);line-height:1.2}
+section{margin-top:34px}
+ul.plain{margin:0;padding-left:20px}ul.plain li{margin:4px 0}
+a{color:var(--red)}
+code{font-size:.9em;background:var(--card);border:1px solid var(--line);border-radius:5px;padding:0 4px}
+footer{margin-top:40px;color:var(--mute);font-size:14px}
+</style>
+</head>
+<body>
+<main>
+  <h1>NW Style <span>2027</span> · demo</h1>
+  <p class="lead">Dalle schede dei giudici alla classifica: iscritti, pettorali, schede da stampare, lettura dei voti con la foto del telefono e classifica di tappa, che passa direttamente nelle classifiche del circuito.</p>
+
+  <div class="note">È una demo: i dati sono di prova (nomi inventati) e restano solo nel tuo browser. Puoi provare tutto senza rompere niente.</div>
+
+  <div class="doors">
+    <a class="door" href="giuria/"><b>Giuria di tappa</b><small>Gara, iscritti, pettorali e manche, schede da stampare, lettura delle foto, classifica di tappa.</small><span class="go">Apri →</span></a>
+    <a class="door" href="classifiche/"><b>Classifiche del circuito</b><small>L'app delle classifiche 2026, qui con due tappe 2027 di prova: Padova è già disputata.</small><span class="go">Apri →</span></a>
+  </div>
+
+  <section>
+    <h2>Come provarla (10 minuti)</h2>
+    <ol class="steps">
+      <li><div>Apri <a href="giuria/">Giuria di tappa</a>. In <b>1 · Gara e schede</b> la tappa è già <b>Mestre (demo)</b>.</div></li>
+      <li><div>Scarica il <a href="esempio_iscritti.xlsx">file degli iscritti di esempio</a> e caricalo con <b>Carica atleti</b>: 105 individuali e 8 coppie, con categoria, ASD e partenza scelta.</div></li>
+      <li><div>Premi <b>Assegna pettorali</b>: Gruppo 1, indifferenti e Gruppo 2 vanno nelle manche da 25 e le sezioni si compilano da sole. Poi <b>Genera schede</b> per vedere le schede di ogni giudice.</div></li>
+      <li><div>In <b>2 · Leggi schede</b> premi <b>Prova con una scheda di esempio</b>: l'app compila una scheda a caso e la legge come se fosse una foto. Se vuoi, stampa una scheda dal PC, compilala a mano e fotografala col telefono.</div></li>
+      <li><div>Premi <b>Simula tutte le schede della tappa</b>, poi apri <b>3 · Classifica</b>: classifica per categoria con <i>Tot. giudici</i> e <i>Punti</i>.</div></li>
+      <li><div>Premi <b>Pubblica nelle classifiche del circuito</b> e apri le <a href="classifiche/">classifiche</a>: Mestre compare accanto a Padova e i punti del circuito si aggiornano.</div></li>
+    </ol>
+  </section>
+
+  <section>
+    <h2>Cosa non c'è ancora</h2>
+    <ul class="plain">
+      <li><b>Formula di tappa provvisoria</b>: Tot. giudici = somma dei giudici di campo nei due giri; Punti = Tot. giudici + voti del giudice capo ÷ 100. Va sostituita con quella del regolamento.</li>
+      <li><b>Archivio comune</b>: nella versione vera i dati stanno in un archivio unico (Supabase), con accesso del comitato, caricamento dei voti da parte dei giudici e classifica pubblica con il solo punteggio totale. I voti dei singoli giudici restano riservati.</li>
+      <li><b>Iscrizioni dal campo gara</b> e <b>pettorali delle coppie</b> assegnati dall'app.</li>
+    </ul>
+  </section>
+
+  <footer>Demo generata da NWS Giuria · i nomi degli atleti sono inventati.</footer>
+</main>
+</body>
+</html>

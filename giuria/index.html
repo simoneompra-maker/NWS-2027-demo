@@ -1,0 +1,1384 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>NWS Giuria · demo 2027</title>
+<meta name="theme-color" content="#111111">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<style>
+:root{--bg:#f4f4f2;--card:#fff;--ink:#141414;--mute:#666;--line:#ddd;--acc:#c0392b;--ok:#1e8a4c;--warn:#d98a00;--bad:#c0392b}
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;background:var(--bg);color:var(--ink)}
+header{background:#111;color:#fff;padding:10px 16px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:5}
+header b{font-size:16px;letter-spacing:.5px}header span{font-size:12px;opacity:.7}
+nav{display:flex;gap:4px;padding:8px 16px;background:#fff;border-bottom:1px solid var(--line);overflow-x:auto}
+nav button{border:0;background:none;padding:8px 12px;border-radius:8px;font-size:14px;cursor:pointer;color:var(--mute);white-space:nowrap}
+nav button.on{background:#111;color:#fff}
+main{padding:16px;max-width:1200px;margin:0 auto}
+.card{background:var(--card);border-radius:12px;padding:16px;margin-bottom:16px;box-shadow:0 1px 2px rgba(0,0,0,.06)}
+.card h2{margin:0 0 12px;font-size:16px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
+label{display:block;font-size:12px;color:var(--mute);margin-bottom:4px}
+input,select,textarea{width:100%;padding:8px 10px;border:1px solid #ccc;border-radius:8px;font:inherit;font-size:14px;background:#fff}
+textarea{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;min-height:90px}
+.btn{border:0;background:#111;color:#fff;padding:10px 16px;border-radius:8px;font-size:14px;cursor:pointer}
+.btn.sec{background:#e9e9e6;color:#111}.btn:disabled{opacity:.4}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.hint{font-size:12px;color:var(--mute);margin:6px 0 0}
+.pages{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:12px}
+.pages .sheet{background:#fff;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.pages .sheet svg{width:100%;height:auto;display:block}
+.pill{display:inline-block;padding:2px 8px;border-radius:99px;font-size:12px;background:#eee}
+.pill.ok{background:#dff3e7;color:var(--ok)}.pill.warn{background:#fff1d6;color:#8a5a00}.pill.bad{background:#fbe1de;color:var(--bad)}
+table.res{border-collapse:collapse;width:100%;font-size:13px}
+table.res th,table.res td{border-bottom:1px solid var(--line);padding:5px 6px;text-align:left;vertical-align:top}
+table.res td.n{font-weight:700}
+.scan{display:grid;grid-template-columns:minmax(0,3fr) minmax(280px,2fr);gap:16px}
+.scan[hidden]{display:none}
+@media(max-width:900px){.scan{grid-template-columns:1fr}}
+.cv-wrap{overflow:auto;border:1px solid var(--line);border-radius:8px;background:#222}
+.cv-wrap canvas{display:block;width:100%;height:auto;cursor:crosshair}
+.drop{border:2px dashed #bbb;border-radius:12px;padding:24px;text-align:center;color:var(--mute)}
+.list .it{display:flex;justify-content:space-between;gap:8px;padding:8px 0;border-bottom:1px solid var(--line);cursor:pointer}
+.digits{display:flex;gap:2px}.digits img{height:26px;border:1px solid #ccc;border-radius:3px;background:#fff}
+#log{font-size:12px;color:var(--mute);white-space:pre-wrap}
+#printArea{display:none}
+@media print{
+  @page{size:A4 landscape;margin:0}
+  body{background:#fff}
+  header,nav,main{display:none!important}
+  #printArea{display:block}
+  #printArea .sheet{width:297mm;height:210mm;page-break-after:always;break-after:page;overflow:hidden}
+  #printArea .sheet svg{width:297mm;height:210mm;display:block}
+}
+</style>
+<script src="../demo-db.js"></script>
+<script>
+window.NWS_CIRCUITO = {
+  stages: [{"id": "demo-mestre", "name": "Mestre (demo)", "code": "MES27", "data": "12/09/2027"}, {"id": "demo-padova", "name": "Padova (demo)", "code": "PAD27", "data": "16/05/2027"}],
+  link: '../classifiche/',
+  publish: function(stage, cats){
+    var d = NWSDemoDB.get();
+    cats.forEach(function(c){
+      var id = stage + '__' + c[0];
+      d.risultati[id] = {id: id, stage_id: stage, cat_id: c[0], rows: c[1], saved_at: new Date().toISOString()};
+      c[1].forEach(function(r){ if (r.assoc && !d.asd_circuiti[r.assoc]) d.asd_circuiti[r.assoc] = {asd_name: r.assoc, circuito: 'nord'}; });
+    });
+    NWSDemoDB.save(d); return cats.length;
+  }
+};
+</script>
+</head>
+<body>
+<header><b>NWS GIURIA</b><span>demo 2027 per il comitato · <a href="../" style="color:#fff">presentazione</a> · <a href="../classifiche/" style="color:#fff">classifiche</a></span></header>
+<nav id="nav">
+  <button data-t="gara" class="on">1 · Gara e schede</button>
+  <button data-t="leggi">2 · Leggi schede</button>
+  <button data-t="class">3 · Classifica</button>
+  <button data-t="info">Info</button>
+</nav>
+<main>
+<section id="t-gara">
+  <div class="card">
+    <h2>Dati gara</h2>
+    <div class="grid">
+      <div><label>Tappa</label><input id="g-tappa" value="Mestre"></div>
+      <div><label>Codice gara (lettere/numeri)</label><input id="g-code" value="MES26" maxlength="8"></div>
+      <div><label>Data</label><input id="g-data" value="12/09/2026"></div>
+      <div><label>Giudici di campo</label><input id="g-ng" type="number" min="1" max="12" value="6"></div>
+      <div><label>Giudici capo</label><input id="g-nc" type="number" min="1" max="3" value="1"></div>
+      <div id="g-stage-box" hidden><label for="g-stage">Tappa del circuito</label><select id="g-stage"></select></div>
+      <div><label>Scheda giudici di campo</label><select id="g-var"><option value="A">A · elementi (1 punto ciascuno)</option><option value="B">B · zone (un cerchio per zona)</option></select></div>
+    </div>
+    <div class="grid" style="margin-top:12px">
+      <div style="grid-column:1/-1"><label>Prove (una per riga, nell'ordine delle postazioni 1, 2, 3…)</label>
+        <textarea id="g-prove" style="min-height:120px"></textarea>
+        <p class="hint">Rotazione: il giudice della postazione 1 nel 2° giro passa alla 2 e viceversa; 3↔4, 5↔6, 7↔8.</p></div>
+      <div style="grid-column:1/-1"><label>Sezioni di gara: <code>TIPO | Nome | pettorali</code> · TIPO = IND (individuale) o COP (coppie)</label>
+        <textarea id="g-sez"></textarea>
+        <p class="hint">Individuale: <code>IND | Gruppo 1 | 1-25</code>. Coppie, con la categoria: <code>COP | Coppie | 151-160 CC, 161-170 CI, 171-176 II</code> (C = camminatrici e camminatori, I = istruttori e istruttrici; MIX = CI). Ogni 25 pettorali si crea un nuovo foglio.</p></div>
+      <div style="grid-column:1/-1"><label for="g-atl">Atleti (facoltativo)</label>
+        <div class="row" style="margin-bottom:6px">
+          <label class="btn sec" style="margin:0">Carica atleti (Excel o CSV)<input id="atl-file" type="file" accept=".xlsx,.xls,.ods,.csv,.txt" hidden></label>
+          <select id="atl-sheet" style="width:auto" hidden></select>
+          <span class="hint" id="atl-load" style="margin:0"></span>
+        </div>
+        <textarea id="g-atl" style="min-height:120px" placeholder="Carica il file degli iscritti, oppure incolla qui la tabella con la riga dei titoli"></textarea>
+        <div class="row" style="margin-top:6px">
+          <label for="g-colp" style="margin:0">Colonna pettorale</label><select id="g-colp" style="width:auto"></select>
+          <label for="g-colc" style="margin:0">Colonna categoria</label><select id="g-colc" style="width:auto"></select>
+        </div>
+        <p class="hint" id="atl-info"></p></div>
+      <div style="grid-column:1/-1"><label>Pettorali e manche (individuali)</label>
+        <div class="row">
+          <label for="g-p1" style="margin:0">Primo pettorale</label><input id="g-p1" type="number" min="1" value="1" style="width:80px">
+          <label for="g-ord" style="margin:0">Ordine</label><select id="g-ord" style="width:auto">
+            <option value="cognome">cognome A→Z</option><option value="-cognome">cognome Z→A</option>
+            <option value="nome">nome A→Z</option><option value="-nome">nome Z→A</option><option value="caso">casuale</option></select>
+          <label for="g-man" style="margin:0">Atleti per manche</label><input id="g-man" type="number" min="5" max="60" value="25" style="width:70px">
+          <label for="g-max" style="margin:0">Massimo per manche</label><input id="g-max" type="number" min="5" max="60" value="30" style="width:70px">
+        </div>
+        <div class="row" style="margin-top:8px">
+          <button class="btn sec" id="b-assign">Assegna pettorali</button>
+          <button class="btn sec" id="b-export">Scarica elenco con pettorali</button>
+        </div>
+        <p class="hint" id="assign-info">Prima il Gruppo 1, poi gli indifferenti fino a riempire le prime due manche, poi il Gruppo 2 con gli indifferenti rimasti. Le sezioni si scrivono da sole, una per manche.</p></div>
+    </div>
+    <div class="row" style="margin-top:12px">
+      <button class="btn" id="b-gen">Genera schede</button>
+      <select id="f-sec" style="width:auto"></select>
+      <select id="f-filter" style="width:auto"></select>
+      <button class="btn sec" id="b-print" disabled>Stampa</button>
+      <span class="hint" id="gen-info"></span>
+    </div>
+    <p class="hint">Stampa in A4 orizzontale, <b>scala 100%</b> (non "adatta alla pagina"), senza margini se la stampante lo consente.</p>
+  </div>
+  <div class="pages" id="pages"></div>
+</section>
+
+<section id="t-leggi" hidden>
+  <div class="card">
+    <h2>Leggi una scheda</h2>
+    <div class="drop" id="drop">
+      <p>Scatta o carica la foto della scheda compilata<br><small>dall'alto, foglio intero, senza flash né riflessi</small></p>
+      <div class="row" style="justify-content:center">
+        <label class="btn" style="color:#fff;margin:0">📷 Scatta / carica<input id="file" type="file" accept="image/*" capture="environment" multiple hidden></label>
+      </div>
+    </div>
+    <div id="log"></div>
+    <div id="needcode"></div>
+    <div class="row" id="demo-box" style="margin-top:12px" hidden>
+      <button class="btn sec" id="b-demo1">Prova con una scheda di esempio</button>
+      <button class="btn sec" id="b-demoall">Simula tutte le schede della tappa</button>
+      <span class="hint" style="margin:0">Schede compilate a caso dall'app, al posto delle foto: solo per la prova.</span>
+    </div>
+  </div>
+  <div class="scan" id="scan" hidden>
+    <div class="card"><h2 id="sc-title">Scheda</h2>
+      <div class="cv-wrap"><canvas id="cv"></canvas></div>
+      <p class="hint">Verde = cerchio pieno · arancio = dubbio. Tocca un cerchio per correggerne la lettura.</p></div>
+    <div class="card"><h2>Voti letti</h2><div id="sc-sum"></div><div id="sc-table"></div></div>
+  </div>
+  <div class="card"><h2>Schede lette in questa sessione</h2><div class="list" id="readList"><p class="hint">Nessuna.</p></div></div>
+</section>
+
+<section id="t-class" hidden>
+  <div class="card"><h2>Classifica di tappa</h2>
+    <div class="row">
+      <label for="cl-gara" style="margin:0">Gara</label><select id="cl-gara" style="width:auto"></select>
+      <button class="btn sec" id="b-cl-xls">Scarica Excel</button>
+      <button class="btn" id="b-cl-pub" hidden>Pubblica nelle classifiche del circuito</button>
+    </div>
+    <p class="hint">Formula provvisoria, da confermare: <b>Tot. giudici</b> = somma dei voti dei giudici di campo nei due giri; <b>Punti</b> = Tot. giudici + voti del giudice capo ÷ 100.</p>
+    <div id="cl-info" style="margin-top:10px"></div>
+  </div>
+  <div id="cl-tab"></div>
+</section>
+
+<section id="t-info" hidden>
+  <div class="card"><h2>Come funziona</h2>
+  <p>1. Inserisci i dati della gara e genera le schede: ognuna ha un QR che identifica tappa, sezione, giudice, foglio e pettorali.</p>
+  <p>2. Dopo la gara fotografa ogni scheda. L'app trova i 4 quadrati neri, raddrizza la foto, legge il QR e misura ogni cerchio. Scatta dall'alto, senza flash né riflessi sul foglio.</p>
+  <p>3. Le anomalie (cerchi dubbi, totale scritto, correzioni, assenti con voti, righe vuote) vengono evidenziate per la verifica.</p>
+  <p class="hint">Demo di studio — versione <span id="ver"></span>. La lettura avviene sul dispositivo: nessuna foto viene inviata.</p></div>
+</section>
+</main>
+<div id="printArea"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+<script>
+'use strict';
+const VERSION = '0.4.1';
+document.getElementById('ver').textContent = VERSION;
+const OPENCV_URL = 'https://cdn.jsdelivr.net/npm/@techstark/opencv-js@4.10.0-release.1/dist/opencv.js';
+
+/* ======================= MODELLO SCHEDA (mm) ======================= */
+const TEC = [['S1','Piede bacino spalle','S'],['S2','Sguardo avanti','S'],
+  ['C1','Ampiezza braccia','C'],['C2','Braccio morbido','C'],['C3','Mano chiusa in spinta','C'],
+  ['C4','Mano aperta dietro','C'],['C5','Bastoncino inclinato','C'],
+  ['I1','Tallone → avampiede','I'],['I2','Piede-bastone insieme','I'],['I3','Bastone tra i piedi','I']];
+const SINC = [['K1','Bastoncini simultanei','K'],['K2','Passo in fase','K'],['K3','Stessa ampiezza','K'],
+  ['K4','Distanza costante','K'],['K5','Cambio insieme','K']];
+const ZONE = {S:['SUP. 0–2','#2563a8'],C:['CENTRALE 0–5','#c0392b'],I:['INF. 0–3','#2e7d4f'],K:['SINCRONIA 1–5','#7b4bb0']};
+const SYNC = [1, 2, 3, 4, 5];   // sincronia coppie: un solo voto da 1 a 5
+// Variante B (scheda di campo a zone): un cerchio per zona = elementi corretti, in ordine decrescente
+const ZB = [['S', 2, 'piede-bacino-spalle · sguardo avanti'],
+  ['C', 5, 'ampiezza braccia · braccio morbido · mano chiusa in spinta · mano aperta dietro · bastoncino inclinato'],
+  ['I', 3, 'tallone → avampiede · piede-bastone insieme · bastone tra i piedi']];
+const ZBN = {S:'SUPERIORE', C:'CENTRALE', I:'INFERIORE', K:'SINCRONIA'};
+const NUM_COL = '#4a4a4a';      // colore dei numeri stampati dentro i cerchi
+const G = {W:297,H:210,FID:6,FIDP:[[4,4],[287,4],[4,200],[287,200]],TX:4,TW:289,TY:24,H1:4.6,H2:3.2,H3:14,RH:6.0,NR:25,
+           FIX:[10,6,6.5],QR:{x:265,y:3.4,s:14},R:2.1};
+G.RY = G.TY + G.H1 + G.H2 + G.H3;                // 45.8
+G.GW = (G.TW - G.FIX.reduce((a,b)=>a+b,0)) / 2;   // larghezza di un giro
+G.FC = G.FIDP.map(([x,y]) => [x + G.FID/2, y + G.FID/2]); // centri dei riferimenti
+
+function pairPost(p){ return p % 2 ? p + 1 : p - 1; }
+
+/* Geometria completa di una scheda: colonne, cerchi e caselle */
+function layout(sh){
+  const L = {cols:[], bubbles:[], boxes:[]};
+  const coppie = sh.type !== 'IND';
+  const g0x = G.TX + G.FIX[0] + G.FIX[1] + G.FIX[2];
+  const assX = G.TX + G.FIX[0] + G.FIX[1] + G.FIX[2]/2;
+  for (let r = 0; r < G.NR; r++){
+    if (!sh.rows[r]) continue;
+    const cy = G.RY + r*G.RH + G.RH/2;
+    L.bubbles.push({row:r, giro:-1, key:'ASS', cx:assX, cy, r:G.R});
+  }
+  for (let g = 0; g < 2; g++){
+    const x0 = g0x + g*G.GW;
+    let units;
+    if (sh.kind === 'campo' && sh.variant === 'B'){
+      units = [{k:'AE',u:1,t:'b'}];
+      ZB.forEach(([z, n]) => { for (let v = n; v >= 0; v--) units.push({k:'Z'+z+v,u:1,t:'b',z,val:v}); });
+      if (coppie) SYNC.slice().reverse().forEach(n => units.push({k:'Y'+n,u:1,t:'b',z:'K',val:n}));
+      units.push({k:'NP',u:1,t:'q'}, {k:'SG',u:.85,t:'s'});
+      const cw = G.GW / units.reduce((a,b)=>a+b.u,0);
+      let x = x0; units.forEach(u => { u.x = x; u.w = u.u*cw; x += u.w; });
+    } else if (sh.kind === 'campo'){
+      units = [{k:'AE',u:1,t:'b'}].concat(TEC.map(i=>({k:i[0],u:1,t:'b',z:i[2],lab:i[1]})),
+              coppie ? SYNC.map(n => ({k:'Y'+n,u:1,t:'b',z:'K',val:n})) : [],
+              [{k:'D1',u:1,t:'d'},{k:'D2',u:1,t:'d'},{k:'NP',u:1,t:'q'},{k:'SG',u:.85,t:'s'}]);
+      const cw = G.GW / units.reduce((a,b)=>a+b.u,0);
+      let x = x0; units.forEach(u => { u.x = x; u.w = u.u*cw; x += u.w; });
+    } else {
+      const ns = coppie ? 5 : 0, kw = 5, dg = 6, sg = 5.2;
+      const vw = G.GW - ns*kw - 2*dg - sg;
+      units = [{k:'V',x:x0,w:vw,t:'v'}];
+      let x = x0 + vw;
+      if (coppie) SYNC.forEach(n => { units.push({k:'Y'+n,x,w:kw,t:'b',z:'K',val:n}); x += kw; });
+      units.push({k:'D1',x,w:dg,t:'d'}); x += dg; units.push({k:'D2',x,w:dg,t:'d'}); x += dg;
+      units.push({k:'SG',x,w:sg,t:'s'});
+    }
+    L.cols.push(units);
+    for (let r = 0; r < G.NR; r++){
+      if (!sh.rows[r]) continue;
+      const y = G.RY + r*G.RH, cy = y + G.RH/2;
+      units.forEach(u => {
+        if (u.t === 'b') L.bubbles.push({row:r,giro:g,key:u.k,val:u.val,cx:u.x+u.w/2,cy,r:u.val !== undefined ? Math.min(G.R, u.w*.42) : G.R});
+        else if (u.t === 'q') L.bubbles.push({row:r,giro:g,key:u.k,cx:u.x+u.w/2,cy,r:1.9,sq:1});
+        else if (u.t === 'd') L.boxes.push({row:r,giro:g,key:u.k,x:u.x+.7,y:y+.7,w:u.w-1.4,h:G.RH-1.4});
+        else if (u.t === 's') L.boxes.push({row:r,giro:g,key:u.k,x:u.x+.6,y:y+.6,w:u.w-1.2,h:G.RH-1.2});
+        else if (u.t === 'v'){
+          const m = 1.5, gap = .9, p = (u.w - 2*m - 4*gap) / 21, rr = Math.min(G.R, p*.44);
+          for (let v = 0; v <= 20; v++){
+            const cx = u.x + m + p/2 + v*p + Math.floor(v/5)*gap;
+            L.bubbles.push({row:r,giro:g,key:'V'+v,val:v,cx,cy,r:rr});
+          }
+        }
+      });
+    }
+  }
+  return L;
+}
+
+/* ======================= DISEGNO SVG ======================= */
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function txt(x,y,s,o={}){
+  return `<text x="${x}" y="${y}" font-size="${o.fs||2}" font-weight="${o.fw||400}" fill="${o.fill||'#111'}" text-anchor="${o.a||'start'}"${o.ls?` letter-spacing="${o.ls}"`:''}${o.tr?` transform="${o.tr}"`:''}>${o.raw?s:esc(s)}</text>`;
+}
+function wrap(s, n){
+  const w = s.split(' '), out = [''];
+  w.forEach(t => { const c = out[out.length-1]; if ((c + ' ' + t).trim().length > n && c) out.push(t); else out[out.length-1] = (c + ' ' + t).trim(); });
+  return out;
+}
+function qrPath(data, x, y, s){
+  const q = qrcode(0, 'M'); q.addData(data, 'Alphanumeric'); q.make();
+  const n = q.getModuleCount(), m = s / n; let d = '';
+  for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (q.isDark(r, c)) d += `M${(x+c*m).toFixed(3)} ${(y+r*m).toFixed(3)}h${m.toFixed(3)}v${m.toFixed(3)}h-${m.toFixed(3)}z`;
+  return `<rect x="${x-1}" y="${y-1}" width="${s+2}" height="${s+2}" fill="#fff"/><path d="${d}" fill="#000"/>`;
+}
+
+function sheetSVG(sh){
+  const L = layout(sh), coppie = sh.type !== 'IND', o = [];
+  const tot = G.RY + G.NR*G.RH, g0x = G.TX + G.FIX[0] + G.FIX[1] + G.FIX[2];
+  o.push(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${G.W} ${G.H}" width="${G.W}mm" height="${G.H}mm" font-family="DejaVu Sans, Arial, Helvetica, sans-serif">`);
+  o.push(`<rect width="${G.W}" height="${G.H}" fill="#fff"/>`);
+  G.FIDP.forEach(([x,y]) => o.push(`<rect x="${x}" y="${y}" width="${G.FID}" height="${G.FID}" fill="#000"/>`));
+  // testata
+  o.push(txt(13, 7.2, 'NORDIC WALKING STYLE · CIRCUITO 2026', {fs:1.8, fill:'#555', ls:.15}));
+  o.push(txt(13, 11.6, sh.title, {fs:3.6, fw:800, fill:'#c0392b'}));
+  o.push(txt(13, 15.6, sh.subtitle, {fs:2.2, fw:700}));
+  const meta = sh.meta; let mx = 66;
+  meta.forEach(([k, v, w]) => {
+    o.push(txt(mx, 7.4, k.toUpperCase(), {fs:1.6, fill:'#666', ls:.1}));
+    o.push(txt(mx, 12, v, {fs:2.7, fw:600}));
+    o.push(`<line x1="${mx}" y1="13.6" x2="${mx+w-2.5}" y2="13.6" stroke="#999" stroke-width=".25"/>`);
+    mx += w;
+  });
+  o.push(qrPath(sh.payload, G.QR.x, G.QR.y, G.QR.s));
+  // istruzioni
+  wrap(sh.ins, 232).slice(0, 2).forEach((l, i) => o.push(txt(13, 19.6 + i*2.3, l, {fs:1.7, fill:'#222'})));
+  // intestazione pettorali
+  o.push(`<rect x="${G.TX}" y="${G.TY}" width="${G.FIX[0]+G.FIX[1]}" height="${G.RY-G.TY}" fill="#fff" stroke="#777" stroke-width=".2"/>`);
+  const ind = sh.type === 'IND';   // individuali: solo il pettorale, la categoria non si stampa
+  o.push(txt(G.TX+8, G.TY+9, 'PETT.', {fs:2.4, fw:700, a:'middle'}));
+  if (!ind) o.push(txt(G.TX+8, G.TY+12, 'Cat.', {fs:1.8, fill:'#555', a:'middle'}));
+  const ax = G.TX+G.FIX[0]+G.FIX[1];
+  o.push(`<rect x="${ax}" y="${G.TY}" width="${G.FIX[2]}" height="${G.RY-G.TY}" fill="#fff" stroke="#777" stroke-width=".2"/>`);
+  o.push(txt(ax+G.FIX[2]/2+.8, G.RY-1.2, 'ASSENTE', {fs:2, fw:800, tr:`rotate(-90 ${ax+G.FIX[2]/2+.8} ${G.RY-1.2})`}));
+  // intestazioni giri
+  for (let g = 0; g < 2; g++){
+    const x0 = g0x + g*G.GW, U = L.cols[g];
+    o.push(`<rect x="${x0}" y="${G.TY}" width="${G.GW}" height="${G.H1}" fill="#111"/>`);
+    const gt = sh.kind === 'campo' ? `${g+1}° GIRO · POSTAZIONE ${g ? sh.post2 : sh.post1}` : `${g+1}° GIRO`;
+    const gs = sh.kind === 'campo' ? ` · Prova: ${g ? sh.prova2 : sh.prova1}` : ' · Gesto tecnico complessivo nella tecnica alternata';
+    o.push(`<text x="${x0+G.GW/2}" y="${G.TY+3.3}" font-size="2.5" fill="#fff" text-anchor="middle"><tspan font-weight="800">${esc(gt)}</tspan><tspan font-size="2.1">${esc(gs)}</tspan></text>`);
+    // fascia zone
+    const zy = G.TY + G.H1;
+    const spans = [];
+    U.forEach(u => {
+      let z = u.t === 'b' ? (u.z || 'AE') : (u.t === 'v' ? 'V' : 'CTRL');
+      if (spans.length && spans[spans.length-1].z === z) { spans[spans.length-1].w += u.w; }
+      else spans.push({z, x:u.x, w:u.w});
+    });
+    spans.forEach(s => {
+      const [lab, col] = s.z === 'AE' ? ['AE','#c0392b'] : s.z === 'V' ? ['ARMONIA E FLUIDITÀ · 0–20','#b8860b'] :
+                         s.z === 'CTRL' ? [s.w < 14 ? 'CONTR.' : 'CONTROLLO','#111'] : [s.z === 'K' && sh.kind === 'capo' ? 'SINCR. 1–5' : sh.variant === 'B' ? ZBN[s.z] : ZONE[s.z][0], ZONE[s.z][1]];
+      o.push(`<rect x="${s.x}" y="${zy}" width="${s.w}" height="${G.H2}" fill="${col}" stroke="#fff" stroke-width=".15"/>`);
+      o.push(txt(s.x+s.w/2, zy+2.35, lab, {fs:1.75, fw:700, fill:'#fff', a:'middle', ls:.1}));
+    });
+    // etichette colonne
+    const ly = zy + G.H2, lb = G.RY - 1;
+    U.forEach(u => {
+      if (u.k[0] === 'Y'){
+        const ys = U.filter(z => z.k[0] === 'Y'); if (u !== ys[0]) return;
+        const w5 = ys.reduce((t, z) => t + z.w, 0);
+        o.push(`<rect x="${u.x}" y="${ly}" width="${w5}" height="${G.H3}" fill="#fff" stroke="#777" stroke-width=".2"/>`);
+        o.push(txt(u.x+w5/2, ly+5.2, 'Annerisci', {fs:1.9, a:'middle'}));
+        o.push(txt(u.x+w5/2, ly+8, 'UN SOLO voto', {fs:2.1, fw:800, a:'middle'}));
+        o.push(txt(u.x+w5/2, ly+10.8, sh.variant === 'B' ? 'da 5 a 1' : 'da 1 a 5', {fs:1.9, a:'middle'}));
+        return;
+      }
+      if (u.k[0] === 'Z'){
+        // promemoria dei criteri della zona, sopra i suoi cerchi
+        const zs = U.filter(z => z.z === u.z); if (u !== zs[0]) return;
+        const wz = zs.reduce((t, z) => t + z.w, 0), [, n, crit] = ZB.find(z => z[0] === u.z);
+        o.push(`<rect x="${u.x}" y="${ly}" width="${wz}" height="${G.H3}" fill="#fff" stroke="#777" stroke-width=".2"/>`);
+        wrap(crit, Math.floor((wz - 1.2) / .82)).slice(0, 4).forEach((l, i) => o.push(txt(u.x+wz/2, ly+2.5+i*2.05, l, {fs:1.5, fill:'#333', a:'middle'})));
+        o.push(txt(u.x+wz/2, ly+12.6, `da ${n}: −1 per errore`, {fs:1.6, fw:800, a:'middle'}));
+        return;
+      }
+      if (u.k !== 'D1' && u.k !== 'D2') o.push(`<rect x="${u.x}" y="${ly}" width="${u.w}" height="${G.H3}" fill="#fff" stroke="#777" stroke-width=".2"/>`);
+      if (u.t === 'v'){
+        o.push(txt(u.x+u.w/2, ly+6, 'Annerisci UN SOLO cerchio da 0 a 20', {fs:2.1, fw:600, a:'middle'}));
+        o.push(txt(u.x+u.w/2, ly+9, 'postura · fluidità · eleganza · correttezza tecnica · dinamicità', {fs:1.7, fill:'#666', a:'middle'}));
+        return;
+      }
+      if (u.k === 'D1'){
+        const w2 = u.w*2;
+        o.push(`<rect x="${u.x}" y="${ly}" width="${w2}" height="${G.H3}" fill="#fff" stroke="#777" stroke-width=".2"/>`);
+        o.push(txt(u.x+w2/2, ly+5, sh.kind === 'campo' ? 'TOTALE' : 'VOTO', {fs:2.1, fw:800, a:'middle'}));
+        o.push(txt(u.x+w2/2, ly+8, '2 cifre', {fs:1.7, a:'middle'}));
+        o.push(txt(u.x+w2/2, ly+10.8, sh.kind === 'campo' ? (coppie ? '00–15' : '00–10') : '00–20', {fs:1.7, fill:'#666', a:'middle'}));
+        return;
+      }
+      if (u.k === 'D2') return;
+      const cx = u.x + u.w/2;
+      let lines;
+      if (u.k === 'AE') lines = [['Andatura', 1], ['errata = 0', 1]];
+      else if (u.k === 'NP') lines = [['Non', 1], ['passato', 1]];
+      else if (u.k === 'SG') lines = [['Sigla', 1]];
+      else { const w = wrap(u.lab, 13).slice(0, 2); lines = [[u.k, 1]].concat(w.map(l => [l, 0])); }
+      // testo verticale: righe affiancate, lette dal basso
+      const lh = 2.05, n = lines.length, x0l = cx - (n-1)*lh/2 + .7;
+      lines.forEach(([l, b], i) => {
+        const xx = x0l + i*lh;
+        o.push(txt(xx, lb, l, {fs: b ? 1.95 : 1.75, fw: b ? 800 : 400, tr:`rotate(-90 ${xx} ${lb})`}));
+      });
+    });
+  }
+  // righe
+  for (let r = 0; r < G.NR; r++){
+    const y = G.RY + r*G.RH, row = sh.rows[r];
+    if (!row){
+      o.push(`<rect x="${G.TX}" y="${y}" width="${G.TW}" height="${G.RH}" fill="#ececec"/>`);
+      continue;
+    }
+    o.push(txt(G.TX + (ind ? (G.FIX[0] + G.FIX[1])/2 : 5), y + 4.4, row.p, {fs:3.7, fw:800, a:'middle'}));
+    if (!ind) o.push(txt(G.TX + G.FIX[0] + G.FIX[1]/2, y + 4, catLabel(row.cat || ''), {fs:1.9, fill:'#444', a:'middle'}));
+  }
+  // griglia
+  const vx = new Set([G.TX, ...(ind ? [] : [G.TX+G.FIX[0]]), G.TX+G.FIX[0]+G.FIX[1], g0x, g0x+G.GW, G.TX+G.TW]);
+  L.cols.forEach(U => U.forEach(u => { if (u.k !== 'D2') vx.add(+u.x.toFixed(3)); }));
+  vx.forEach(x => o.push(`<line x1="${x}" y1="${G.RY}" x2="${x}" y2="${tot}" stroke="#777" stroke-width=".2"/>`));
+  L.cols.forEach(U => { const d2 = U.find(u => u.k === 'D2'); if (d2) o.push(`<line x1="${d2.x}" y1="${G.RY}" x2="${d2.x}" y2="${tot}" stroke="#bbb" stroke-width=".2"/>`); });
+  // variante B: separatori spessi tra le zone
+  if (sh.variant === 'B') L.cols.forEach(U => U.forEach((u, i) => { if (i && u.z !== U[i-1].z) o.push(`<line x1="${u.x}" y1="${G.RY}" x2="${u.x}" y2="${tot}" stroke="#111" stroke-width=".5"/>`); }));
+  for (let r = 0; r <= G.NR; r++){
+    const y = G.RY + r*G.RH, th = (r % 5 === 0 && r) ? .55 : .2;
+    o.push(`<line x1="${G.TX}" y1="${y}" x2="${G.TX+G.TW}" y2="${y}" stroke="${th > .3 ? '#111' : '#777'}" stroke-width="${th}"/>`);
+  }
+  o.push(`<line x1="${g0x}" y1="${G.TY}" x2="${g0x}" y2="${tot}" stroke="#111" stroke-width=".6"/>`);
+  o.push(`<line x1="${g0x+G.GW}" y1="${G.TY}" x2="${g0x+G.GW}" y2="${tot}" stroke="#111" stroke-width=".9"/>`);
+  // cerchi e caselle
+  L.bubbles.forEach(b => {
+    if (b.sq) o.push(`<rect x="${b.cx-b.r}" y="${b.cy-b.r}" width="${b.r*2}" height="${b.r*2}" rx=".5" fill="none" stroke="#333" stroke-width=".28"/>`);
+    else {
+      const red = b.key === 'AE';
+      o.push(`<circle cx="${b.cx}" cy="${b.cy}" r="${b.r}" fill="none" stroke="${red ? '#c0392b' : '#222'}" stroke-width="${red ? .38 : .28}"/>`);
+      if (b.val !== undefined) o.push(txt(b.cx, b.cy + b.r*.36, b.val, {fs: b.r*1.0, fw:600, fill:NUM_COL, a:'middle'}));
+    }
+  });
+  L.boxes.forEach(b => { if (b.key !== 'SG') o.push(`<rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" fill="#fff" stroke="#111" stroke-width=".45"/>`); });
+  // piè di pagina
+  const fy = 202.6;
+  o.push(txt(13, fy, 'Firma ' + (sh.kind === 'campo' ? 'giudice' : 'giudice capo'), {fs:1.9}));
+  o.push(`<line x1="40" y1="${fy+.6}" x2="128" y2="${fy+.6}" stroke="#111" stroke-width=".25"/>`);
+  o.push(txt(134, fy, 'Ora consegna', {fs:1.9}));
+  o.push(`<line x1="154" y1="${fy+.6}" x2="178" y2="${fy+.6}" stroke="#111" stroke-width=".25"/>`);
+  o.push(`<rect x="183" y="${fy-2.4}" width="3" height="3" fill="none" stroke="#111" stroke-width=".3"/>`);
+  o.push(txt(187.5, fy, 'Foto di controllo scattata', {fs:1.9}));
+  o.push(txt(284, fy, 'Codice ' + sh.payload + ' · demo v' + VERSION, {fs:2.0, fill:'#444', a:'end'}));
+  o.push('</svg>');
+  return o.join('');
+}
+
+/* ======================= GARA → SCHEDE ======================= */
+function chk(s){ let t = 0; for (const c of s) t = (t*31 + c.charCodeAt(0)) % 1679; return (t % 36).toString(36).toUpperCase(); }
+function makePayload(code, sec, judge, f, p1, p2){
+  const base = `NWS1.${code}.${sec}.${judge}.F${f}.${p1}.${p2}`;
+  return base + '.' + chk(base);
+}
+function parsePayload(s){
+  const m = /^NWS1\.([A-Z0-9]+)\.(\d+)(IND|COP|MIX)\.(G\d+B?|C\d+)\.F(\d+)\.(\d+)\.(\d+)\.([0-9A-Z])$/.exec((s||'').trim().toUpperCase());
+  if (!m) return null;
+  const base = s.trim().toUpperCase().slice(0, -2);
+  return {code:m[1], sec:+m[2], type:m[3], judge:m[4].replace(/B$/, ''), variant: /B$/.test(m[4]) ? 'B' : 'A',
+          foglio:+m[5], p1:+m[6], p2:+m[7], ok: chk(base) === m[8]};
+}
+function parseSezioni(txtv){
+  const out = [];
+  txtv.split('\n').map(l => l.trim()).filter(Boolean).forEach((l, i) => {
+    const [t, nome, pp] = l.split('|').map(s => (s||'').trim());
+    const type = (t||'').toUpperCase();
+    if (!['IND','COP','MIX'].includes(type)) throw new Error(`Riga ${i+1}: tipo "${t}" non valido (IND o COP)`);
+    const atl = [];
+    (pp||'').split(',').map(s => s.trim()).filter(Boolean).forEach(tok => {
+      const m = /^(\d+)(?:\s*-\s*(\d+))?(?:\s+([A-Za-z/]{1,4}))?$/.exec(tok);
+      if (!m) throw new Error(`Riga ${i+1}: "${tok}" non riconosciuto (es. 1-25, oppure 151-160 CC per le coppie)`);
+      let cat = m[3] ? m[3].toUpperCase() : '';
+      if (type !== 'IND' && cat && !(cat = coupleCat(cat))) throw new Error(`Riga ${i+1}: categoria "${m[3]}" non valida per le coppie (CC, CI o II)`);
+      for (let p = +m[1]; p <= +(m[2]||m[1]); p++) atl.push({p, cat: type === 'MIX' && !cat ? 'CI' : cat});
+    });
+    out.push({idx:i+1, type, nome, atl});
+  });
+  return out;
+}
+/* categorie delle coppie: C = camminatrici e camminatori, I = istruttori e istruttrici; MIX vale CI */
+function coupleCat(c){
+  c = (c||'').toUpperCase().replace(/[^A-Z]/g, '');
+  if (c === 'MIX' || c === 'IC') return 'CI';
+  return ['CC','CI','II'].includes(c) ? c : '';
+}
+const catLabel = c => c.length === 2 ? c[0] + '/' + c[1] : c;   // CI → C/I
+/* categoria del singolo atleta: Camminatrice/Camminatore = C, Istruttrice/Istruttore = I */
+const oneCat = c => /^(c|camm)/i.test((c||'').trim()) ? 'C' : /^(i|istr)/i.test((c||'').trim()) ? 'I' : '';
+
+/* elenco atleti incollato da un foglio di calcolo: si tengono tutte le colonne; pettorale e categoria
+   si riconoscono dal titolo o si scelgono a mano */
+/* l'elenco atleti come tabella: titoli e righe (array di celle) */
+function atlTable(txtv){
+  const lines = (txtv||'').split(/\r?\n/).filter(l => l.trim());
+  if (!lines.length) return null;
+  // tabulazione (Carica atleti, incolla da un foglio di calcolo) anche se la prima riga ha una sola colonna
+  const sep = txtv.includes('\t') || !/[;,]/.test(lines[0]) ? '\t' : lines[0].includes(';') ? ';' : ',';
+  const split = l => l.split(sep).map(s => s.trim());
+  let head = split(lines[0]), body = lines.slice(1);
+  if (head.some(h => /^\d+$/.test(h))){ body = lines; head = head.map((_, i) => ['Pettorale','Nome','Categoria'][i] || 'Colonna ' + (i+1)); }
+  return {head, rows: body.map(split)};
+}
+const PETT_RE = /^(pett|n\.?$|n°|num|bib)/i;
+function parseAtleti(txtv, colP, colC){
+  const T = atlTable(txtv);
+  if (!T) return null;
+  const {head} = T, find = re => head.findIndex(h => re.test(h));
+  const ip = colP !== '' && colP != null && +colP < head.length ? +colP : find(PETT_RE);
+  const ic = colC !== '' && colC != null && +colC < head.length ? +colC : find(/^cat/i);
+  const nomeCols = head.map((h, i) => i).filter(i => i !== ip && i !== ic && /cognome|nome|atlet|coppia/i.test(head[i]));
+  const byP = {}, warn = []; let senza = 0;
+  if (ip < 0) warn.push('nessuna colonna pettorale: premi "Assegna pettorali" oppure scegli la colonna');
+  else T.rows.forEach((c, n) => {
+    const p = parseInt(c[ip], 10);
+    if (!(c[ip]||'').trim()){ senza++; return; }
+    if (!p){ warn.push(`riga ${n+2}: pettorale "${c[ip]}" non valido`); return; }
+    const campi = {}; head.forEach((h, i) => campi[h] = c[i] || '');
+    const nome = nomeCols.map(i => c[i]).filter(Boolean).join(' '), cat = ic >= 0 ? (c[ic]||'').trim() : '';
+    if (byP[p]){ byP[p].nome += ' / ' + nome; byP[p].campi = [].concat(byP[p].campi, campi); byP[p].cats.push(cat); }   // coppia su due righe
+    else byP[p] = {p, nome, cat, cats: [cat], campi};
+  });
+  if (senza) warn.unshift(`${senza} righe senza pettorale`);
+  return {head, ip, ic, byP, warn};
+}
+
+/* assegnazione dei pettorali individuali: Gruppo 1, poi indifferenti fino a riempire le prime due manche,
+   poi Gruppo 2 con gli indifferenti rimasti; le coppie tengono il pettorale del file */
+function mancheSizes(n, base, max){
+  const k = Math.floor(n / base), rem = n - k*base, out = Array(k).fill(base);
+  if (rem && k && rem <= max - base) out[k-1] += rem;   // pochi in più: nell'ultima manche
+  else if (rem) out.push(rem);
+  return out;
+}
+const ranges = ps => { const out = []; ps.slice().sort((a, b) => a - b).forEach(p => { const r = out[out.length-1]; if (r && p === r[1] + 1) r[1] = p; else out.push([p, p]); }); return out.map(([a, b]) => a === b ? `${a}` : `${a}-${b}`); };
+function assignBibs(){
+  const T = atlTable(v('g-atl'));
+  if (!T || !T.rows.length) throw new Error('carica prima l\'elenco degli atleti');
+  const H = T.head, find = re => H.findIndex(h => re.test(h));
+  let ip = v('g-colp') !== '' ? +v('g-colp') : find(PETT_RE);
+  if (ip < 0){ H.unshift('Pettorale'); T.rows.forEach(r => r.unshift('')); ip = 0; $('g-colp').value = ''; }
+  const ig = find(/partenz|gruppo/i), it = find(/^(gara|tipo)/i), ic = find(/^cognome/i), inn = find(/^nome/i);
+  if (ig < 0) throw new Error('manca la colonna della partenza scelta (Gruppo 1, Gruppo 2, Indifferente)');
+  const isCop = r => it >= 0 && /copp/i.test(r[it] || '');
+  const ind = T.rows.filter(r => !isCop(r)), cop = T.rows.filter(isCop);
+  const ord = v('g-ord'), col = ord.replace('-', '') === 'nome' ? inn : ic, dir = ord[0] === '-' ? -1 : 1;
+  const sort = a => ord === 'caso' ? a.map(r => [Math.random(), r]).sort((x, y) => x[0] - y[0]).map(x => x[1])
+    : a.slice().sort((x, y) => dir * String(x[col] || '').localeCompare(String(y[col] || ''), 'it', {sensitivity:'base'}) || dir * String(x[ic === col ? inn : ic] || '').localeCompare(String(y[ic === col ? inn : ic] || ''), 'it'));
+  const grp = r => /1/.test(r[ig] || '') ? 1 : /2/.test(r[ig] || '') ? 2 : 0;
+  const base = Math.max(5, +v('g-man') || 25), max = Math.max(base, +v('g-max') || base), cap1 = 2*base;
+  const g1 = sort(ind.filter(r => grp(r) === 1)), indiff = sort(ind.filter(r => grp(r) === 0));
+  const fill = indiff.slice(0, Math.max(0, cap1 - g1.length));
+  const g2 = sort(ind.filter(r => grp(r) === 2).concat(indiff.slice(fill.length)));
+  const order = g1.concat(fill, g2), p1 = Math.max(1, +v('g-p1') || 1);
+  order.forEach((r, i) => r[ip] = String(p1 + i));
+  // sezioni: una per manche, più le coppie con i pettorali del file
+  const sizes = mancheSizes(order.length, base, max), sez = []; let a = p1;
+  sizes.forEach((n, i) => { sez.push(`IND | Manche ${i+1} | ${a}-${a + n - 1}`); a += n; });
+  const pc = [...new Set(cop.map(r => parseInt(r[ip], 10)).filter(Boolean))];
+  if (pc.length) sez.push(`COP | Coppie | ${ranges(pc).join(', ')}`);
+  $('g-atl').value = [H].concat(T.rows).map(r => r.join('\t')).join('\n'); $('g-sez').value = sez.join('\n');
+  atlPreview();
+  const g2s = g2.length - (indiff.length - fill.length);
+  return `Gruppo 1: ${g1.length} scelti + ${fill.length} indifferenti · Gruppo 2: ${g2s} scelti + ${indiff.length - fill.length} indifferenti · ` +
+    `${sizes.length} manche (${sizes.join(', ')}), pettorali ${p1}–${p1 + order.length - 1}` +
+    (cop.length ? ` · coppie: ${pc.length} pettorali dal file` + (cop.some(r => !parseInt(r[ip], 10)) ? ' ⚠ alcune coppie senza pettorale' : '') : '') +
+    (g1.length > cap1 ? ` · il Gruppo 1 sfora nella 3ª manche` : '') + (sizes.some(n => n > G.NR) ? ` · le manche oltre ${G.NR} atleti si stampano su due fogli` : '');
+}
+function readGara(){
+  const sezioni = parseSezioni(v('g-sez')), A = parseAtleti(v('g-atl'), v('g-colp'), v('g-colc'));
+  if (A && A.ip < 0) throw new Error('Atleti: scegli quale colonna contiene il pettorale');
+  sezioni.forEach(sec => sec.atl.forEach(a => {
+    const x = A && A.byP[a.p];
+    if (x){ a.nome = x.nome; a.campi = x.campi; }
+    if (sec.type === 'IND'){ if (x && x.cat) a.cat = x.cat; return; }
+    // coppia su due righe: la categoria nasce dai due atleti (Camminatore + Istruttrice = C/I)
+    const two = x && x.cats.length === 2 && x.cats.every(oneCat) ? coupleCat(x.cats.map(oneCat).sort().join('')) : '';
+    const ca = two || (x && x.cat ? coupleCat(x.cat) : '');
+    if (x && x.cat && !ca) throw new Error(`Atleti: pettorale ${a.p}, categoria "${x.cat}" non valida per le coppie (CC, CI o II)`);
+    if (a.cat && ca && a.cat !== ca) throw new Error(`Pettorale ${a.p}: categoria ${catLabel(a.cat)} nelle sezioni ma ${catLabel(ca)} nell'elenco atleti`);
+    a.cat = a.cat || ca;
+    if (!a.cat) throw new Error(`Pettorale ${a.p}: manca la categoria della coppia (CC, CI o II)`);
+  }));
+  return {
+    tappa: v('g-tappa'), code: v('g-code').toUpperCase().replace(/[^A-Z0-9]/g,''), data: v('g-data'),
+    ng: Math.max(1, +v('g-ng')||6), nc: Math.max(1, +v('g-nc')||1), varCampo: v('g-var') === 'B' ? 'B' : 'A',
+    prove: v('g-prove').split('\n').map(s=>s.trim()).filter(Boolean),
+    stage: v('g-stage') || '',
+    sezioni
+  };
+}
+function buildSheets(gara){
+  const sheets = [];
+  gara.sezioni.forEach(sec => {
+    const fogli = []; for (let i = 0; i < sec.atl.length; i += G.NR) fogli.push(sec.atl.slice(i, i+G.NR));
+    const tipoLab = sec.type === 'IND' ? 'Individuale' : 'Coppie';
+    fogli.forEach((rows, fi) => {
+      const p1 = rows[0].p, p2 = rows[rows.length-1].p;
+      const gara1 = `${tipoLab} · ${sec.nome}${fogli.length > 1 ? ` · foglio ${fi+1}/${fogli.length}` : ''}`;
+      const corrIns = 'Correzione: X sul cerchio sbagliato, annerisci quello giusto e firma in "Sigla". Pettorale assente: barra tutta la riga e annerisci ASS.';
+      const commonIns = 'Totale/voto: sempre due cifre, una per quadratino (08, non 8). ' + corrIns;
+      const vB = gara.varCampo === 'B';
+      for (let j = 1; j <= gara.ng; j++){
+        const post1 = j, post2 = pairPost(j) <= gara.ng ? pairPost(j) : j;
+        const sec2 = `${sec.idx}${sec.type}`;
+        sheets.push({kind:'campo', type:sec.type, judge:'G'+j, variant: vB ? 'B' : 'A', sec:sec.idx, foglio:fi+1, rows,
+          title: sec.type === 'IND' ? 'GIUDICE DI CAMPO' : 'GIUDICE DI CAMPO · COPPIE', subtitle: `Giudice G${j}` + (vB ? ' · scheda a zone' : ''),
+          post1, post2, prova1: gara.prove[post1-1] || `Prova ${post1}`, prova2: gara.prove[post2-1] || `Prova ${post2}`,
+          meta: [['Tappa', gara.tappa, 30], ['Data', gara.data, 24], ['Gara', gara1, 62], ['Nome giudice', '', 40], ['Assenti al briefing', '', 40]],
+          ins: vB ? `Giudice di campo. Per ogni zona annerisci UN SOLO cerchio = elementi corretti: parti dal numero più alto e scendi di uno per ogni errore (0 = tutti errati). Nessuna zona vuota. AE = andatura sbagliata: solo il cerchio rosso. NP = non transitato. ${sec.type!=='IND'?'Sincronia: UN SOLO voto da 5 a 1 (con AE non si vota). ':''}2° giro: alla postazione indicata. ` + corrIns :
+               `Giudice di campo. Annerisci un cerchio per ogni elemento eseguito correttamente (1 punto ciascuno) e scrivi nel TOTALE quanti sono. AE = andatura sbagliata: solo il cerchio rosso. NP = non transitato. ${sec.type!=='IND'?'Sincronia: annerisci UN SOLO voto da 1 a 5 (con AE non si vota). ':''}2° giro: alla postazione indicata. ` + commonIns,
+          payload: makePayload(gara.code, sec2, 'G'+j+(vB ? 'B' : ''), fi+1, p1, p2)});
+      }
+      for (let c = 1; c <= gara.nc; c++){
+        sheets.push({kind:'capo', type:sec.type, judge:'C'+c, sec:sec.idx, foglio:fi+1, rows,
+          title: sec.type === 'IND' ? 'GIUDICE CAPO' : 'GIUDICE CAPO · COPPIE', subtitle: gara.nc > 1 ? `Giudice capo ${c}` : 'Giudice capo',
+          meta: [['Tappa', gara.tappa, 30], ['Data', gara.data, 24], ['Gara', gara1, 62], ['Nome giudice capo', '', 40], ['Assenti al briefing', '', 40]],
+          ins: `Giudice capo. Per ogni pettorale e ogni giro annerisci UN SOLO cerchio da 0 a 20 e riscrivi il voto nel riquadro VOTO. ${sec.type!=='IND'?'Sincronia della coppia: annerisci UN SOLO voto da 1 a 5. ':''}` + commonIns,
+          payload: makePayload(gara.code, `${sec.idx}${sec.type}`, 'C'+c, fi+1, p1, p2)});
+      }
+    });
+  });
+  return sheets;
+}
+
+/* ======================= UI: GARA ======================= */
+const $ = id => document.getElementById(id), v = id => $(id).value;
+const DEF_PROVE = ['1 Parallelo a 3 + 3 monobraccio','P3 sospeso + P2 + alternato sospeso','Prova 3','Prova 4','Prova 5','Prova 6','Prova 7','Prova 8'];
+const DEF_SEZ = 'IND | Gruppo 1 | 1-25\nCOP | Coppie | 151-160 CC, 161-170 CI, 171-176 II';
+function store(k, val){ try { localStorage.setItem('nwsg.'+k, JSON.stringify(val)); } catch(e){} }
+function load(k){ try { return JSON.parse(localStorage.getItem('nwsg.'+k)); } catch(e){ return null; } }
+let SHEETS = [];
+// versione collegata alle classifiche di circuito (demo): tappe del circuito e schede di esempio
+if (window.NWS_CIRCUITO){
+  $('g-stage-box').hidden = false; $('demo-box').hidden = false;
+  $('g-stage').innerHTML = NWS_CIRCUITO.stages.map(t => `<option value="${t.id}">${esc(t.name)}</option>`).join('');
+  $('g-stage').onchange = () => { const t = NWS_CIRCUITO.stages.find(t => t.id === v('g-stage')); if (t){ $('g-tappa').value = t.name; $('g-code').value = t.code; $('g-data').value = t.data; } };
+  if (!load('form')) setTimeout(() => $('g-stage').onchange());   // prima apertura: dati della prima tappa
+}
+(function initGara(){
+  const s = load('form');
+  $('g-prove').value = DEF_PROVE.join('\n'); $('g-sez').value = DEF_SEZ;
+  if (s) Object.entries(s).forEach(([k, val]) => { if ($(k)) $(k).value = val; });
+  atlPreview();   // riempie i menu delle colonne, poi rimette la scelta salvata
+  if (s){ $('g-colp').value = s['g-colp'] || ''; $('g-colc').value = s['g-colc'] || ''; atlPreview(); }
+})();
+function saveForm(){ const f = {}; ['g-tappa','g-code','g-data','g-ng','g-nc','g-var','g-prove','g-sez','g-atl','g-colp','g-colc','g-p1','g-ord','g-man','g-max','g-stage'].forEach(k => f[k] = v(k)); store('form', f); }
+/* anteprima dell'elenco atleti: colonne riconosciute e menu per sceglierle a mano */
+function atlPreview(){
+  const cp = v('g-colp'), cc = v('g-colc'), A = parseAtleti(v('g-atl'), cp, cc);
+  const opts = (sel, cur) => { $(sel).innerHTML = '<option value="">automatica</option>' + (A ? A.head.map((h, i) => `<option value="${i}">${esc(h)}</option>`).join('') : ''); $(sel).value = cur; };
+  opts('g-colp', cp); opts('g-colc', cc);
+  if (!A){ $('atl-info').textContent = 'Nessun elenco: le schede si generano lo stesso, senza nomi.'; return; }
+  const n = Object.keys(A.byP).length, col = i => i >= 0 ? `«${A.head[i]}»` : 'non trovata';
+  $('atl-info').textContent = `${n} atleti letti · colonne: ${A.head.join(' · ')} · pettorale = ${col(A.ip)}, categoria = ${col(A.ic)}` + (A.warn.length ? ' · ⚠ ' + A.warn.slice(0, 3).join('; ') : '');
+}
+$('g-atl').oninput = $('g-colp').onchange = $('g-colc').onchange = atlPreview;
+$('b-assign').onclick = () => {
+  try { $('assign-info').textContent = '✓ ' + assignBibs(); saveForm(); }
+  catch(e){ $('assign-info').textContent = '⚠ ' + e.message; }
+};
+// elenco per la segreteria: tutte le colonne più la manche di ogni pettorale (funziona dal PC)
+$('b-export').onclick = async () => {
+  try {
+    const T = atlTable(v('g-atl')); if (!T) throw new Error('nessun elenco atleti');
+    const ip = v('g-colp') !== '' ? +v('g-colp') : T.head.findIndex(h => PETT_RE.test(h));
+    const man = {}; parseSezioni(v('g-sez')).forEach(sec => sec.atl.forEach(a => man[a.p] = sec.nome));
+    const X = await loadXLSX(), num = c => /^\d+$/.test(c) ? +c : c;
+    const rows = [T.head.concat('Manche')].concat(T.rows.map(r => r.map(num).concat(man[parseInt(r[ip], 10)] || '')));
+    const wb = X.utils.book_new(); X.utils.book_append_sheet(wb, X.utils.aoa_to_sheet(rows), 'Pettorali');
+    X.writeFile(wb, `pettorali_${v('g-code') || 'gara'}.xlsx`);
+  } catch(e){ $('assign-info').textContent = '⚠ ' + e.message; }
+};
+
+/* Carica atleti: Excel con SheetJS (scaricato solo quando serve), CSV letto direttamente */
+const XLSX_URL = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+let xlsxReady = null, ATL_BOOK = null;
+function loadXLSX(){
+  return xlsxReady = xlsxReady || new Promise((res, rej) => {
+    if (window.XLSX) return res(window.XLSX);
+    const sc = document.createElement('script'); sc.src = XLSX_URL;
+    sc.onload = () => res(window.XLSX); sc.onerror = () => { xlsxReady = null; rej(new Error('serve la connessione a internet per leggere i file Excel')); };
+    document.head.appendChild(sc);
+  });
+}
+function parseCSV(t){
+  const first = t.split(/\r?\n/)[0], sep = (first.match(/;/g)||[]).length > (first.match(/,/g)||[]).length ? ';' : first.includes('\t') ? '\t' : ',';
+  const rows = [[]]; let f = '', q = false;
+  for (let i = 0; i < t.length; i++){
+    const c = t[i];
+    if (q){ if (c === '"' && t[i+1] === '"'){ f += '"'; i++; } else if (c === '"') q = false; else f += c; }
+    else if (c === '"') q = true;
+    else if (c === sep){ rows[rows.length-1].push(f); f = ''; }
+    else if (c === '\n' || c === '\r'){ if (c === '\r' && t[i+1] === '\n') i++; rows[rows.length-1].push(f); f = ''; rows.push([]); }
+    else f += c;
+  }
+  rows[rows.length-1].push(f);
+  return rows;
+}
+// una riga per atleta, colonne separate da tabulazione (le celle non devono contenerne)
+const rowsToTSV = rows => rows.map(r => r.map(c => String(c ?? '').replace(/[\t\r\n]+/g, ' ').trim()))
+  .filter(r => r.some(Boolean)).map(r => r.join('\t')).join('\n');
+function showSheet(name){
+  const rows = XLSX.utils.sheet_to_json(ATL_BOOK.Sheets[name], {header:1, raw:false, defval:''});
+  $('g-atl').value = rowsToTSV(rows); $('g-colp').value = $('g-colc').value = ''; atlPreview();
+}
+$('atl-file').onchange = async e => {
+  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  $('atl-load').textContent = `Lettura di ${f.name}…`; $('atl-sheet').hidden = true; ATL_BOOK = null;
+  try {
+    if (/\.(csv|txt)$/i.test(f.name)){
+      let t = await f.text(); if (t.includes('\ufffd')) t = new TextDecoder('windows-1252').decode(await f.arrayBuffer());   // CSV salvato da Excel italiano
+      $('g-atl').value = rowsToTSV(parseCSV(t)); $('g-colp').value = $('g-colc').value = ''; atlPreview();
+    } else {
+      const X = await loadXLSX();
+      ATL_BOOK = X.read(await f.arrayBuffer(), {type:'array'});
+      const names = ATL_BOOK.SheetNames, sel = $('atl-sheet');
+      sel.innerHTML = names.map(n => `<option>${esc(n)}</option>`).join(''); sel.hidden = names.length < 2;
+      showSheet(names[0]);
+    }
+    $('atl-load').textContent = `✓ ${f.name}` + ($('atl-sheet').hidden ? '' : ' · scegli il foglio:');
+  } catch(err){ $('atl-load').textContent = `⚠ ${f.name}: ${err.message}`; }
+};
+$('atl-sheet').onchange = () => showSheet(v('atl-sheet'));
+$('b-gen').onclick = () => {
+  let gara;
+  try { gara = readGara(); } catch(e){ $('gen-info').textContent = '⚠ ' + e.message; return; }
+  if (!gara.code) { $('gen-info').textContent = '⚠ Inserisci un codice gara'; return; }
+  saveForm();
+  const garas = load('gare') || {}; garas[gara.code] = gara; store('gare', garas);
+  SHEETS = buildSheets(gara);
+  const fs = $('f-sec'); fs.innerHTML = '<option value="*">Tutte le sezioni</option>';
+  gara.sezioni.forEach(s => fs.insertAdjacentHTML('beforeend', `<option value="${s.idx}">${s.type === 'IND' ? 'Individuale' : s.type === 'COP' ? 'Coppie' : 'Coppie miste'} · ${s.nome}</option>`));
+  const f = $('f-filter'); f.innerHTML = '<option value="*">Tutte le schede</option>';
+  [...new Set(SHEETS.map(s => s.judge))].forEach(j => f.insertAdjacentHTML('beforeend', `<option value="${j}">Solo ${j.startsWith('G') ? 'giudice ' + j : 'capo ' + j.slice(1)}</option>`));
+  renderPages(); $('b-print').disabled = false;
+};
+$('f-filter').onchange = $('f-sec').onchange = renderPages;
+function filtered(){ const f = v('f-filter'), sc = v('f-sec'); return SHEETS.filter(s => (f === '*' || s.judge === f) && (sc === '*' || String(s.sec) === sc)); }
+function renderPages(){
+  const list = filtered();
+  $('pages').innerHTML = list.map(s => `<div class="sheet">${sheetSVG(s)}</div>`).join('');
+  $('gen-info').textContent = `${list.length} ${list.length === 1 ? 'scheda' : 'schede'}`;
+}
+$('b-print').onclick = () => {
+  $('printArea').innerHTML = filtered().map(s => `<div class="sheet">${sheetSVG(s)}</div>`).join('');
+  setTimeout(() => window.print(), 50);
+};
+
+/* ======================= LETTURA OTTICA ======================= */
+const S = 8;                    // pixel per mm dell'immagine raddrizzata
+const DARK = 0.55;              // soglia "inchiostro" rispetto al bianco carta locale
+const T_FULL = 0.42, T_DUB = 0.09;
+let cvReady = null;
+function loadOpenCV(){
+  if (cvReady) return cvReady;
+  cvReady = new Promise((res, rej) => {
+    if (window.cv && window.cv.Mat) return res(window.cv);
+    const s = document.createElement('script'); s.src = OPENCV_URL; s.async = true;
+    // il modulo OpenCV è "thenable": va tolto il then prima di risolvere, altrimenti la Promise lo riattende all'infinito
+    const done = m => { try { delete m.then; } catch(e){} window.cv = m; res(m); };
+    s.onload = () => { const c = window.cv; if (c && c.Mat) done(c); else if (c && c.then) c.then(done); else c.onRuntimeInitialized = () => done(c); };
+    s.onerror = () => rej(new Error('Impossibile caricare OpenCV'));
+    document.head.appendChild(s);
+  });
+  return cvReady;
+}
+
+function imgToCanvas(img, maxSide){
+  const k = Math.min(1, maxSide / Math.max(img.naturalWidth || img.width, img.naturalHeight || img.height));
+  const c = document.createElement('canvas');
+  c.width = Math.round((img.naturalWidth || img.width) * k); c.height = Math.round((img.naturalHeight || img.height) * k);
+  c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); c._k = k; return c;
+}
+
+/* trova i 4 quadrati neri: restituisce 4 centri in ordine orario (in coordinate dell'immagine) */
+function findFiducials(cv, canvas){
+  const src = cv.imread(canvas), gray = new cv.Mat(), bin = new cv.Mat();
+  cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
+  cv.GaussianBlur(gray, gray, new cv.Size(5, 5), 0);
+  const bs = Math.max(31, (Math.round(Math.max(canvas.width, canvas.height) / 25) | 1));
+  cv.adaptiveThreshold(gray, bin, 255, cv.ADAPTIVE_THRESH_MEAN_C, cv.THRESH_BINARY_INV, bs, 18);
+  const cnts = new cv.MatVector(), hier = new cv.Mat();
+  cv.findContours(bin, cnts, hier, cv.RETR_LIST, cv.CHAIN_APPROX_SIMPLE);
+  const W = canvas.width, H = canvas.height, imgA = W*H, cand = [];
+  for (let i = 0; i < cnts.size(); i++){
+    const c = cnts.get(i), a = cv.contourArea(c);
+    if (a < imgA*0.00004 || a > imgA*0.01) { c.delete(); continue; }
+    const r = cv.boundingRect(c);
+    if (r.x <= 1 || r.y <= 1 || r.x + r.width >= W-1 || r.y + r.height >= H-1) { c.delete(); continue; }
+    // forma a 4 lati: con la foto inclinata il quadrato diventa un parallelogramma (un cerchio invece non ci sta in 4 lati)
+    if (!isQuad(cv, c, a)) { c.delete(); continue; }
+    // riempimento reale dentro il contorno (esclude i riquadri del QR, che sono vuoti dentro)
+    const mask = cv.Mat.zeros(r.height, r.width, cv.CV_8UC1), one = new cv.MatVector(); one.push_back(c);
+    cv.drawContours(mask, one, 0, new cv.Scalar(255), -1, cv.LINE_8, new cv.Mat(), 0, new cv.Point(-r.x, -r.y));
+    const roi = bin.roi(r), inter = new cv.Mat(); cv.bitwise_and(roi, mask, inter);
+    const fill = cv.countNonZero(inter) / Math.max(1, cv.countNonZero(mask));
+    [mask, roi, inter, one].forEach(m => m.delete());
+    if (fill > .85){ const m = cv.moments(c); cand.push({x: m.m10/m.m00, y: m.m01/m.m00, a}); }
+    c.delete();
+  }
+  src.delete(); gray.delete(); bin.delete(); cnts.delete(); hier.delete();
+  if (cand.length < 4) return null;
+  // i quadrati di riferimento sono i più grandi: prova le combinazioni dei candidati maggiori
+  cand.sort((p, q) => q.a - p.a);
+  const top = cand.slice(0, 14);
+  let best = null;
+  for (let i = 0; i < top.length; i++) for (let j = i+1; j < top.length; j++) for (let k = j+1; k < top.length; k++) for (let l = k+1; l < top.length; l++){
+    const q = orderCW([top[i], top[j], top[k], top[l]]);
+    const as = q.map(p => p.a); if (Math.max(...as) / Math.min(...as) > 5) continue;   // con prospettiva forte l'angolo vicino è ~4 volte quello lontano
+    if (!convex(q)) continue;
+    const area = polyArea(q);
+    const d = (p, r) => Math.hypot(p.x - r.x, p.y - r.y);
+    const s1 = (d(q[0], q[1]) + d(q[2], q[3])) / 2, s2 = (d(q[1], q[2]) + d(q[3], q[0])) / 2;
+    const ratio = Math.max(s1, s2) / Math.min(s1, s2);
+    if (ratio < 1.05 || ratio > 2.3) continue;
+    const meanA = as.reduce((x, y) => x + y) / 4;
+    // il lato del quadrato deve essere ~6 mm su ~283 mm di base
+    const expSide = Math.max(s1, s2) * 6 / 283, side = Math.sqrt(meanA);
+    if (side < expSide * .45 || side > expSide * 2.2) continue;
+    const score = area;
+    if (!best || score > best.score) best = {q, score};
+  }
+  return best ? best.q : null;
+}
+/* il contorno si semplifica in 4 vertici, il quadrilatero ne copre l'area (cerchio ~0.64) e i lati non sono troppo diversi */
+function isQuad(cv, c, a){
+  const h = new cv.Mat(), ap = new cv.Mat(); cv.convexHull(c, h);
+  const per = cv.arcLength(h, true);
+  for (const e of [.02, .03, .04, .05, .06, .08]){ cv.approxPolyDP(h, ap, e*per, true); if (ap.rows <= 4) break; }
+  let ok = false;
+  if (ap.rows === 4){
+    const d = ap.data32S, s = [0, 1, 2, 3].map(i => Math.hypot(d[2*i] - d[2*((i+1)%4)], d[2*i+1] - d[2*((i+1)%4)+1]));
+    ok = cv.contourArea(ap) / Math.max(1, a) > .85 && Math.max(...s) / Math.max(1, Math.min(...s)) < 2.2;
+  }
+  h.delete(); ap.delete();
+  return ok;
+}
+function orderCW(pts){
+  const cx = pts.reduce((s, p) => s + p.x, 0) / 4, cy = pts.reduce((s, p) => s + p.y, 0) / 4;
+  const o = pts.slice().sort((p, q) => Math.atan2(p.y - cy, p.x - cx) - Math.atan2(q.y - cy, q.x - cx));
+  // parte dal punto più in alto a sinistra
+  let k = 0; o.forEach((p, i) => { if (p.x + p.y < o[k].x + o[k].y) k = i; });
+  return o.slice(k).concat(o.slice(0, k));
+}
+function convex(q){
+  let sg = 0;
+  for (let i = 0; i < 4; i++){
+    const a = q[i], b = q[(i+1)%4], c = q[(i+2)%4];
+    const z = (b.x - a.x)*(c.y - b.y) - (b.y - a.y)*(c.x - b.x);
+    if (z === 0) return false; if (!sg) sg = Math.sign(z); else if (Math.sign(z) !== sg) return false;
+  }
+  return true;
+}
+function polyArea(q){ let s = 0; for (let i = 0; i < 4; i++){ const a = q[i], b = q[(i+1)%4]; s += a.x*b.y - b.x*a.y; } return Math.abs(s)/2; }
+/* q in ordine orario a partire da un angolo; rot = quale punto è l'angolo in alto a sinistra del foglio */
+function cornersFor(q, rot){ const r = i => q[(i + rot) % 4]; return [r(0), r(1), r(3), r(2)]; } // TL, TR, BL, BR
+
+/* raddrizza solo la zona del QR (veloce), per capire l'orientamento */
+function warpQR(cv, src, pts){
+  const s = 7, x0 = G.QR.x - 3, y0 = G.QR.y - 2.5, w = G.QR.s + 6, h = G.QR.s + 5;
+  const dst = new cv.Mat();
+  const sp = cv.matFromArray(4, 1, cv.CV_32FC2, pts.flatMap(p => [p.x, p.y]));
+  const dp = cv.matFromArray(4, 1, cv.CV_32FC2, G.FC.flatMap(([x, y]) => [(x-x0)*s, (y-y0)*s]));
+  const M = cv.getPerspectiveTransform(sp, dp);
+  cv.warpPerspective(src, dst, M, new cv.Size(w*s, h*s), cv.INTER_LINEAR, cv.BORDER_CONSTANT, new cv.Scalar(255,255,255,255));
+  const c = document.createElement('canvas'); c.width = w*s; c.height = h*s; cv.imshow(c, dst);
+  [dst, sp, dp, M].forEach(m => m.delete());
+  const im = c.getContext('2d').getImageData(0, 0, c.width, c.height);
+  const r = jsQR(im.data, im.width, im.height, {inversionAttempts:'dontInvert'});
+  return r && r.data ? r.data : null;
+}
+function warpSheet(cv, canvas, pts){
+  const src = cv.imread(canvas), dst = new cv.Mat();
+  const sp = cv.matFromArray(4, 1, cv.CV_32FC2, pts.flatMap(p => [p.x, p.y]));
+  const dp = cv.matFromArray(4, 1, cv.CV_32FC2, G.FC.flatMap(([x, y]) => [x*S, y*S]));
+  const M = cv.getPerspectiveTransform(sp, dp);
+  cv.warpPerspective(src, dst, M, new cv.Size(G.W*S, G.H*S), cv.INTER_LINEAR, cv.BORDER_CONSTANT, new cv.Scalar(255,255,255,255));
+  const out = document.createElement('canvas'); out.width = G.W*S; out.height = G.H*S; cv.imshow(out, dst);
+  // mappa "inchiostro": grigio / bianco carta locale (massimo su ~7 mm)
+  const gray = new cv.Mat(), bg = new cv.Mat();
+  cv.cvtColor(dst, gray, cv.COLOR_RGBA2GRAY);
+  const small = new cv.Mat(); cv.resize(gray, small, new cv.Size(G.W*2, G.H*2), 0, 0, cv.INTER_AREA);
+  const k = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(15, 15));
+  cv.dilate(small, small, k); cv.GaussianBlur(small, small, new cv.Size(9, 9), 0);
+  cv.resize(small, bg, new cv.Size(G.W*S, G.H*S), 0, 0, cv.INTER_LINEAR);
+  const g = gray.data, b = bg.data, ink = new Uint8Array(g.length);
+  for (let i = 0; i < g.length; i++){ const ratio = g[i] / Math.max(40, b[i]); ink[i] = ratio < DARK ? 1 : 0; }
+  const gr = new Uint8Array(g);   // copia: i dati di OpenCV spariscono con delete
+  [src, dst, sp, dp, M, gray, bg, small, k].forEach(m => m.delete());
+  return {canvas: out, ink, gray: gr, w: G.W*S, h: G.H*S};
+}
+
+function decodeQR(warp, fallbackCanvas){
+  const tries = [];
+  const ctx = warp.canvas.getContext('2d');
+  const x = (G.QR.x-4)*S, y = Math.max(0, (G.QR.y-3)*S), s = (G.QR.s+8)*S;
+  tries.push(ctx.getImageData(x, y, Math.min(s, warp.w - x), s));
+  if (fallbackCanvas){ const c = fallbackCanvas.getContext('2d'); tries.push(c.getImageData(0, 0, fallbackCanvas.width, fallbackCanvas.height)); }
+  for (const im of tries){ const r = jsQR(im.data, im.width, im.height, {inversionAttempts:'dontInvert'}); if (r && r.data) return r.data; }
+  return null;
+}
+
+/* verso del foglio senza QR: raddrizza nelle 4 rotazioni e confronta (a celle di 1 mm) con il modulo vuoto;
+   la testata e la griglia combaciano solo nel verso giusto */
+function cellInk(m){
+  const out = new Float32Array(G.W*G.H);
+  for (let y = 0; y < m.h; y++){ const cy = Math.min(G.H-1, Math.floor(y/S)) * G.W; for (let x = 0; x < m.w; x++) out[cy + Math.min(G.W-1, Math.floor(x/S))] += m.ink[y*m.w + x]; }
+  return out;
+}
+function pearson(a, b){
+  const n = a.length; let sa = 0, sb = 0, saa = 0, sbb = 0, sab = 0;
+  for (let i = 0; i < n; i++){ sa += a[i]; sb += b[i]; saa += a[i]*a[i]; sbb += b[i]*b[i]; sab += a[i]*b[i]; }
+  const d = Math.sqrt((saa - sa*sa/n) * (sbb - sb*sb/n));
+  return d ? (sab - sa*sb/n) / d : 0;
+}
+const ORIENT_MIN = 0.35, ORIENT_GAP = 0.15;
+function orientByTemplate(cv, full, qf, tpl, w0){
+  const t = cellInk(tpl), sc = [];
+  for (let rot = 0; rot < 4; rot++){
+    const pts = cornersFor(qf, rot), warp = rot === 0 && w0 ? w0 : warpSheet(cv, full, pts);
+    sc.push({rot, pts, warp, r: pearson(t, cellInk(warp))});
+  }
+  sc.sort((a, b) => b.r - a.r);
+  const best = sc[0];
+  best.gap = best.r - sc[1].r;
+  best.ok = best.r >= ORIENT_MIN && best.gap >= ORIENT_GAP;
+  return best;
+}
+
+/* disegna il modulo vuoto alla stessa scala della foto raddrizzata e ne ricava la mappa d'inchiostro */
+const TPL_CACHE = {};
+async function templateInk(sh, payload){
+  const key = sh.kind + sh.type + (sh.variant || 'A') + sh.rows.length;
+  if (TPL_CACHE[key]) return TPL_CACHE[key];
+  const blank = Object.assign({title:'', subtitle:'', meta:[], ins:'', payload, post1:1, post2:2, prova1:'', prova2:''}, sh);
+  const svg = sheetSVG(blank).replace(`width="${G.W}mm" height="${G.H}mm"`, `width="${G.W*S}" height="${G.H*S}"`);
+  const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg); });
+  const c = document.createElement('canvas'); c.width = G.W*S; c.height = G.H*S;
+  const ctx = c.getContext('2d', {willReadFrequently: true}); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height); ctx.drawImage(img, 0, 0);
+  const d = ctx.getImageData(0, 0, c.width, c.height).data, ink = new Uint8Array(c.width*c.height);
+  for (let i = 0; i < ink.length; i++){ const g = (d[i*4]*.299 + d[i*4+1]*.587 + d[i*4+2]*.114); ink[i] = g < 255*DARK ? 1 : 0; }
+  return TPL_CACHE[key] = {ink, w: c.width, h: c.height};
+}
+function inkInDisk(warp, cx, cy, rr){
+  const R = rr*S, x0 = Math.max(0, Math.floor(cx*S - R)), x1 = Math.min(warp.w-1, Math.ceil(cx*S + R));
+  const y0 = Math.max(0, Math.floor(cy*S - R)), y1 = Math.min(warp.h-1, Math.ceil(cy*S + R));
+  let n = 0, k = 0;
+  for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++){
+    const dx = x - cx*S, dy = y - cy*S; if (dx*dx + dy*dy > R*R) continue; n++; k += warp.ink[y*warp.w + x];
+  }
+  return n ? k/n : 0;
+}
+function inkInBox(warp, b, inset){
+  let n = 0, k = 0;
+  for (let y = Math.round((b.y+inset)*S); y < (b.y+b.h-inset)*S; y++) for (let x = Math.round((b.x+inset)*S); x < (b.x+b.w-inset)*S; x++){ n++; k += warp.ink[y*warp.w + x]; }
+  return n ? k/n : 0;
+}
+/* cifre a penna: il tratto è sottile e nella mappa d'inchiostro quasi sparisce. Si misura il grigio della sola parte
+   centrale (1 mm dal bordo stampato) rispetto al bianco della casella stessa, così le ombre sul foglio non contano */
+const DIG_IN = 1.0, DIG_DARK = .75, T_DIG = .06;
+function inkInDigitBox(warp, b){
+  const v = [];
+  for (let y = Math.round((b.y+DIG_IN)*S); y < (b.y+b.h-DIG_IN)*S; y++) for (let x = Math.round((b.x+DIG_IN)*S); x < (b.x+b.w-DIG_IN)*S; x++) v.push(warp.gray[y*warp.w + x]);
+  if (!v.length) return 0;
+  const paper = v.slice().sort((p, q) => p - q)[Math.floor(v.length*.9)];
+  return v.filter(g => g < paper*DIG_DARK).length / v.length;
+}
+/* piccolo riallineamento locale: cerca lo spostamento (±0.9 mm) che centra meglio il contorno stampato dei cerchi di una riga */
+function rowOffset(warp, bubbles){
+  let best = {dx:0, dy:0, s:-1};
+  for (let dy = -0.9; dy <= 0.91; dy += 0.3) for (let dx = -0.9; dx <= 0.91; dx += 0.3){
+    let s = 0;
+    bubbles.forEach(b => { if (b.sq) return; for (let a = 0; a < 12; a++){ const t = a*Math.PI/6; const x = Math.round((b.cx+dx + b.r*Math.cos(t))*S), y = Math.round((b.cy+dy + b.r*Math.sin(t))*S); if (x>=0&&y>=0&&x<warp.w&&y<warp.h) s += warp.ink[y*warp.w+x]; } });
+    if (s > best.s) best = {dx, dy, s};
+  }
+  return best;
+}
+
+/* riallineamento fine di una riga: sposta il modulo vuoto (±1 mm) finché il suo inchiostro coincide meglio con la foto */
+function rowOffsetTpl(warp, tpl, r){
+  const y0 = Math.round((G.RY + r*G.RH + .3)*S), y1 = Math.round((G.RY + (r+1)*G.RH - .3)*S);
+  const x0 = Math.round((G.TX + G.FIX[0] + G.FIX[1])*S), x1 = Math.round((G.TX + G.TW)*S);
+  const pts = [];
+  for (let y = y0; y < y1; y += 2) for (let x = x0; x < x1; x += 2) if (tpl.ink[y*tpl.w + x]) pts.push(y*tpl.w + x);
+  if (!pts.length) return {dx:0, dy:0};
+  const st = 2, R = 8;   // passo 2 px = 0.25 mm, raggio 8 px = 1 mm
+  let best = {dx:0, dy:0, s:-1};
+  for (let dy = -R; dy <= R; dy += st) for (let dx = -R; dx <= R; dx += st){
+    const sh = dy*warp.w + dx; let s = 0;
+    for (let i = 0; i < pts.length; i++) s += warp.ink[pts[i] + sh];
+    if (s > best.s || (s === best.s && Math.abs(dx) + Math.abs(dy) < Math.abs(best.dx*S) + Math.abs(best.dy*S))) best = {dx: dx/S, dy: dy/S, s};
+  }
+  return best;
+}
+/* il foglio si deforma in modo dolce: una riga che si scosta di oltre 0.4 mm dalle vicine (±3 righe) è stata
+   attirata dall'inchiostro (cerchi pieni, X, firma) e prende il valore mediano delle vicine */
+function smoothOffsets(raw){
+  const med = a => { const s = a.slice().sort((x, y) => x - y), n = s.length; return n % 2 ? s[(n-1)/2] : (s[n/2-1] + s[n/2]) / 2; };
+  return raw.map((o, i) => {
+    const nb = raw.filter((_, j) => j !== i && Math.abs(j - i) <= 3);
+    const mx = med(nb.map(q => q.dx)), my = med(nb.map(q => q.dy));
+    return Math.abs(o.dx - mx) > .4 || Math.abs(o.dy - my) > .4 ? {dx: mx, dy: my} : o;
+  });
+}
+async function readSheet(img, manual){
+  const cv = await loadOpenCV();
+  const full = imgToCanvas(img, 3000), det = imgToCanvas(img, 1400);
+  const quad = findFiducials(cv, det);
+  if (!quad) throw new Error('Non trovo i 4 quadrati neri agli angoli: rifai la foto con il foglio intero e ben illuminato.');
+  const kk = full.width / det.width;
+  const qf = quad.map(p => ({x: p.x*kk, y: p.y*kk}));
+  // orientamento: prova le 4 rotazioni finché il QR si legge nella posizione attesa
+  const srcM = cv.imread(full); let qr = null, pts = null;
+  for (let rot = 0; rot < 4 && !qr; rot++){ const c = cornersFor(qf, rot); const d = warpQR(cv, srcM, c); if (d){ qr = d; pts = c; } }
+  srcM.delete();
+  let warp = pts ? warpSheet(cv, full, pts) : null, w0 = null;
+  if (!qr){ w0 = warpSheet(cv, full, cornersFor(qf, 0)); qr = decodeQR(w0, det); }
+  let isManual = false;
+  if (!qr && manual){ qr = manual.toUpperCase().replace(/\s+/g, ''); isManual = true; }
+  const pl = parsePayload(qr);
+  if (!pl){
+    if (isManual) throw new Error(`Codice "${qr}" non valido: copialo per intero, es. NWS1.MES26.1IND.G1.F1.1.25.X`);
+    if (qr) throw new Error(`QR non riconosciuto: ${qr}`);
+    const e = new Error('QR non leggibile: scrivi il codice stampato in basso a destra della scheda.'); e.needCode = true; throw e;
+  }
+  if (!pl.ok) throw new Error(isManual ? 'Codice errato (la lettera finale di controllo non torna): ricontrolla di averlo copiato bene.' : 'Codice di controllo del QR errato: scheda non valida o fotocopiata.');
+  const garas = load('gare') || {}, gara = garas[pl.code];
+  let rows;
+  if (gara){
+    const sec = gara.sezioni.find(s => s.idx === pl.sec);
+    rows = sec ? sec.atl.slice((pl.foglio-1)*G.NR, pl.foglio*G.NR) : null;
+  }
+  if (!rows){ rows = []; for (let p = pl.p1; p <= pl.p2 && rows.length < G.NR; p++) rows.push({p, cat:''}); }
+  const kind = pl.judge.startsWith('G') ? 'campo' : 'capo';
+  const sh = {kind, type: pl.type, rows, judge: pl.judge, variant: kind === 'campo' ? pl.variant : undefined};
+  const L = layout(sh);
+  // inchiostro già stampato nel modulo vuoto (numeri dentro i cerchi): va sottratto dalla misura
+  const tpl = await templateInk(sh, qr);
+  // QR letto solo sulla foto intera, o codice a mano: il verso del foglio lo dà il confronto con il modulo vuoto
+  let orient = null;
+  if (!warp){
+    orient = orientByTemplate(cv, full, qf, tpl, w0);
+    if (!orient.ok) throw new Error('Non riesco a capire il verso del foglio: rifai la foto più vicina e dritta.');
+    warp = orient.warp;
+  }
+  // misura
+  const offs = smoothOffsets([...Array(G.NR).keys()].map(r => rowOffsetTpl(warp, tpl, r)));
+  for (let r = 0; r < G.NR; r++){
+    const rb = L.bubbles.filter(b => b.row === r);
+    if (!rb.length) continue;
+    const off = offs[r];
+    rb.forEach(b => {
+      const rr = b.sq ? b.r*.7 : b.r*.62;
+      b.ox = off.dx; b.oy = off.dy;
+      b.base = b.val !== undefined ? inkInDisk(tpl, b.cx, b.cy, rr) : 0;
+      b.raw = inkInDisk(warp, b.cx+off.dx, b.cy+off.dy, rr); b.fill = Math.max(0, b.raw - b.base) / (1 - b.base);
+    });
+    L.boxes.filter(b => b.row === r).forEach(b => {
+      b.ox = off.dx; b.oy = off.dy;
+      const bb = {x:b.x+off.dx, y:b.y+off.dy, w:b.w, h:b.h};
+      b.fill = b.key[0] === 'D' ? inkInDigitBox(warp, bb) : inkInBox(warp, bb, b.key === 'SG' ? 1.0 : .35);
+    });
+  }
+  L.bubbles.forEach(b => b.state = b.fill >= T_FULL ? 'F' : b.fill >= T_DUB ? 'D' : 'E');
+  const res = {pl, sh, L, warp, payload: qr, manual: isManual, orient: orient && {r: orient.r, gap: orient.gap}, at: new Date().toISOString()};
+  evaluate(res);
+  return res;
+}
+
+/* interpreta i cerchi: voti per riga e anomalie */
+function evaluate(res){
+  const {sh, L} = res, out = [];
+  const isF = b => (b.ovr || b.state) === 'F', isD = b => !b.ovr && b.state === 'D';
+  sh.rows.forEach((row, r) => {
+    const B = L.bubbles.filter(b => b.row === r), X = L.boxes.filter(b => b.row === r);
+    const ass = B.find(b => b.key === 'ASS'), rec = {p: row.p, cat: row.cat, ass: isF(ass), giri: [], flags: []};
+    if (isD(ass)) rec.flags.push('ASS dubbio');
+    for (let g = 0; g < 2; g++){
+      const bg = B.filter(b => b.giro === g), xg = X.filter(b => b.giro === g);
+      const gi = {score: null, sync: null, flags: []};
+      const sigla = xg.find(b => b.key === 'SG'), digs = xg.filter(b => b.key[0] === 'D');
+      gi.digitsInk = digs.map(d => d.fill > T_DIG);
+      if (rec.ass){
+        const strong = bg.filter(b => b.fill > .65 && b.key !== 'AE').length;
+        if (strong > 2) gi.flags.push('Assente ma con voti');
+        rec.giri.push(gi); continue;
+      }
+      if (sigla && sigla.fill > .06) gi.flags.push('Correzione siglata: verificare');
+      const dub = bg.filter(isD); if (dub.length) gi.flags.push(`${dub.length} cerchi dubbi`);
+      if (sh.kind === 'campo' && sh.variant === 'B'){
+        const ae = isF(bg.find(b => b.key === 'AE')), np = isF(bg.find(b => b.key === 'NP'));
+        const zs = bg.filter(b => b.key[0] === 'Z' && isF(b));
+        const ys = bg.filter(b => b.key[0] === 'Y' && isF(b)), cop = sh.type !== 'IND';
+        if (ae && np) gi.flags.push('AE e NP insieme');
+        if (np){ gi.np = true; if (zs.length + ys.length) gi.flags.push('NP ma con voti'); }
+        else if (ae){ gi.ae = true; gi.score = 0; if (zs.length) gi.flags.push('AE ma con voti nelle zone'); if (ys.length) gi.flags.push('AE ma con sincronia'); }
+        else {
+          // un cerchio obbligatorio per zona: zona vuota o con più cerchi = punteggio non assegnato
+          let ok = true; gi.zone = {};
+          ZB.forEach(([z]) => {
+            const f = zs.filter(b => b.key[1] === z);
+            if (f.length === 1) gi.zone[z] = f[0].val;
+            else { ok = false; gi.flags.push(f.length ? `${ZBN[z]}: ${f.length} cerchi (${f.map(b => b.val).join(', ')})` : `${ZBN[z]} vuota`); }
+          });
+          if (cop){ if (ys.length === 1) gi.sync = ys[0].val; else { ok = false; gi.flags.push(ys.length ? `${ys.length} voti di sincronia (${ys.map(b => b.val).join(', ')})` : 'Sincronia mancante'); } }
+          if (ok){ gi.tec = gi.zone.S + gi.zone.C + gi.zone.I; gi.score = gi.tec + (gi.sync || 0); }
+        }
+        if (!cop) gi.sync = null;
+      } else if (sh.kind === 'campo'){
+        const ae = isF(bg.find(b => b.key === 'AE')), np = isF(bg.find(b => b.key === 'NP'));
+        const tec = bg.filter(b => /^[SCI]\d$/.test(b.key) && isF(b)).length;
+        const ys = bg.filter(b => b.key[0] === 'Y' && isF(b)), cop = sh.type !== 'IND';
+        if (ae && np) gi.flags.push('AE e NP insieme');
+        if (np){ gi.np = true; if (tec + ys.length) gi.flags.push('NP ma con voti'); }
+        else if (ae){ gi.ae = true; gi.score = 0; if (tec) gi.flags.push('AE ma con elementi tecnici'); if (ys.length) gi.flags.push('AE ma con sincronia'); }
+        else {
+          if (cop){ if (ys.length === 1) gi.sync = ys[0].val; else gi.flags.push(ys.length ? `${ys.length} voti di sincronia (${ys.map(b => b.val).join(', ')})` : 'Sincronia mancante'); }
+          gi.score = tec + (gi.sync || 0);
+          if (!tec && !ys.length && !dub.length) gi.flags.push('Riga vuota senza AE/NP');
+        }
+        gi.tec = tec; if (!cop) gi.sync = null;
+      } else {
+        const vs = bg.filter(b => b.key[0] === 'V' && isF(b));
+        const ys = bg.filter(b => b.key[0] === 'Y' && isF(b)), cop = sh.type !== 'IND';
+        gi.sync = null;
+        if (cop){ if (ys.length === 1) gi.sync = ys[0].val; else gi.flags.push(ys.length ? `${ys.length} voti di sincronia (${ys.map(b => b.val).join(', ')})` : 'Sincronia mancante'); }
+        if (vs.length === 1){ gi.voto = vs[0].val; gi.score = vs[0].val + (gi.sync || 0); }
+        else if (vs.length === 0) gi.flags.push('Nessun voto 0–20');
+        else gi.flags.push(`${vs.length} voti anneriti (${vs.map(b => b.val).join(', ')})`);
+      }
+      if (gi.score !== null && digs.length && !gi.digitsInk.some(Boolean)) gi.flags.push('Totale scritto mancante');
+      rec.giri.push(gi);
+    }
+    rec.flags = rec.flags.concat(...rec.giri.map((g, i) => g.flags.map(f => `${i+1}° giro: ${f}`)));
+    out.push(rec);
+  });
+  res.rows = out;
+  return res;
+}
+
+/* ======================= UI: LETTURA ======================= */
+const READS = [];
+let CUR = null;
+function logm(s){ $('log').textContent = s; }
+const PENDING = [];   // foto con QR illeggibile, in attesa del codice scritto a mano
+async function readOne(name, img, code){
+  const res = await readSheet(img, code);
+  READS.unshift(res); CUR = res; saveReading(res); showRead(res); renderReadList();
+  logm(`✓ ${name}: ${res.payload}${res.manual ? ' (codice a mano)' : ''}`);
+}
+$('file').onchange = async e => {
+  const files = [...e.target.files]; e.target.value = '';
+  for (const f of files){
+    logm(`Lettura di ${f.name}… (la prima volta carica il motore di lettura, ~10 MB)`);
+    let img = null;
+    try { img = await fileToImg(f); await readOne(f.name, img); }
+    catch(err){
+      logm(`✗ ${f.name}: ${err.message}`); console.error(err);
+      if (err.needCode){ PENDING.push({name: f.name, img}); renderPending(); }
+    }
+  }
+};
+function renderPending(){
+  $('needcode').innerHTML = PENDING.map((p, i) => `<div class="card" style="margin:12px 0 0;padding:12px;border:1px solid var(--warn)">
+    <b>${esc(p.name)}</b>: QR non leggibile.<p class="hint">Scrivi il codice stampato in basso a destra della scheda, dopo «Codice» (es. NWS1.MES26.1IND.G1.F1.1.25.X).</p>
+    <div class="row" style="margin-top:8px;gap:8px"><input data-i="${i}" placeholder="NWS1.…" autocapitalize="characters" autocomplete="off" spellcheck="false" style="flex:1;font-family:ui-monospace,monospace">
+    <button class="btn" data-go="${i}">Leggi</button><button class="btn sec" data-drop="${i}">Scarta</button></div>
+    <p class="hint" data-msg="${i}"></p></div>`).join('');
+  document.querySelectorAll('#needcode [data-go]').forEach(b => b.onclick = async () => {
+    const i = +b.dataset.go, p = PENDING[i], code = document.querySelector(`#needcode input[data-i="${i}"]`).value;
+    const msg = document.querySelector(`#needcode [data-msg="${i}"]`);
+    if (!code.trim()){ msg.textContent = 'Scrivi il codice.'; return; }
+    b.disabled = true; msg.textContent = 'Lettura…';
+    try { await readOne(p.name, p.img, code); PENDING.splice(i, 1); renderPending(); }
+    catch(err){ msg.textContent = '✗ ' + err.message; b.disabled = false; }
+  });
+  document.querySelectorAll('#needcode [data-drop]').forEach(b => b.onclick = () => { PENDING.splice(+b.dataset.drop, 1); renderPending(); });
+  document.querySelectorAll('#needcode input').forEach(inp => inp.onkeydown = e => { if (e.key === 'Enter') document.querySelector(`#needcode [data-go="${inp.dataset.i}"]`).click(); });
+}
+function fileToImg(f){ return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error('Immagine non valida')); i.src = URL.createObjectURL(f); }); }
+const drop = $('drop');
+['dragover','dragenter'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.style.borderColor = '#111'; }));
+drop.addEventListener('dragleave', () => drop.style.borderColor = '');
+drop.addEventListener('drop', e => { e.preventDefault(); drop.style.borderColor = ''; $('file').files = e.dataTransfer.files; $('file').onchange({target: $('file')}); });
+
+function drawOverlay(res){
+  const cvs = $('cv'), w = res.warp.canvas;
+  cvs.width = w.width; cvs.height = w.height;
+  const ctx = cvs.getContext('2d'); ctx.drawImage(w, 0, 0);
+  res.L.bubbles.forEach(b => {
+    const st = b.ovr || b.state; if (st === 'E' && !b.ovr) return;
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = st === 'F' ? (b.ovr ? '#0a84ff' : '#1e8a4c') : st === 'D' ? '#f39c12' : '#0a84ff';
+    ctx.fillStyle = st === 'F' ? 'rgba(30,138,76,.25)' : 'rgba(243,156,18,.25)';
+    ctx.beginPath(); ctx.arc((b.cx + (b.ox||0))*S, (b.cy + (b.oy||0))*S, b.r*S + 3, 0, Math.PI*2);
+    if (st !== 'E') ctx.fill(); ctx.stroke();
+  });
+}
+$('cv').addEventListener('click', e => {
+  if (!CUR) return;
+  const rect = e.target.getBoundingClientRect(), x = (e.clientX - rect.left) * (e.target.width / rect.width) / S, y = (e.clientY - rect.top) * (e.target.height / rect.height) / S;
+  const b = CUR.L.bubbles.find(b => Math.hypot(b.cx + (b.ox||0) - x, b.cy + (b.oy||0) - y) <= b.r + .4);
+  if (!b) return;
+  const cur = b.ovr || b.state; b.ovr = cur === 'F' ? 'E' : 'F';
+  evaluate(CUR); saveReading(CUR); showRead(CUR); renderReadList();
+});
+function digitImgs(res, r, g){
+  return res.L.boxes.filter(b => b.row === r && b.giro === g && b.key[0] === 'D').map(b => {
+    const c = document.createElement('canvas'); c.width = b.w*S; c.height = b.h*S;
+    c.getContext('2d').drawImage(res.warp.canvas, (b.x+(b.ox||0))*S, (b.y+(b.oy||0))*S, b.w*S, b.h*S, 0, 0, c.width, c.height);
+    return `<img src="${c.toDataURL('image/jpeg', .7)}">`;
+  }).join('');
+}
+function showRead(res){
+  $('scan').hidden = false;
+  const pl = res.pl;
+  $('sc-title').textContent = `${pl.judge.startsWith('G') ? 'Giudice ' + pl.judge + (pl.variant === 'B' ? ' (zone)' : '') : 'Capo ' + pl.judge.slice(1)} · ${pl.type} · foglio ${pl.foglio} · ${pl.code}`;
+  drawOverlay(res);
+  const nf = res.rows.filter(r => r.flags.length).length;
+  $('sc-sum').innerHTML = `<p>${res.rows.length} righe · ${res.rows.filter(r => r.ass).length} assenti · ` +
+    (nf ? `<span class="pill warn">${nf} righe da verificare</span>` : `<span class="pill ok">nessuna anomalia</span>`) + '</p>';
+  const capo = res.sh.kind === 'capo';
+  $('sc-table').innerHTML = '<table class="res"><tr><th>Pett.</th><th>1° giro</th><th>2° giro</th><th>Note</th></tr>' + res.rows.map((r, i) => {
+    const cell = g => { const x = r.giri[g]; if (r.ass) return '<span class="pill">ASS</span>';
+      const val = x.np ? 'NP' : x.ae ? 'AE' : x.score === null ? '—' : x.score;
+      const det = x.zone && x.score !== null && !x.ae ? ` <small>(${x.zone.S}·${x.zone.C}·${x.zone.I}${x.sync !== null ? ' + ' + x.sync : ''})</small>` : capo && x.voto !== undefined && x.sync !== null ? ` <small>(${x.voto}+${x.sync})</small>` : (!capo && x.sync !== null && x.score !== null && !x.ae) ? ` <small>(${x.tec}+${x.sync})</small>` : '';
+      return `<b>${val}</b>${det}<div class="digits">${digitImgs(res, i, g)}</div>`; };
+    const row = res.sh.rows[i] || {}, asd = [].concat(row.campi || []).map(c => Object.entries(c).find(([h]) => /asd|societ|squadra|club/i.test(h))).filter(Boolean).map(e => e[1]);
+    const chi = [row.nome, res.sh.type === 'IND' ? row.cat : catLabel(row.cat || ''), [...new Set(asd)].join(' / ')].filter(Boolean).map(esc).join(' · ');
+    return `<tr><td class="n">${r.p}<br><small>${chi}</small></td><td>${cell(0)}</td><td>${cell(1)}</td><td>${r.flags.map(f => `<span class="pill warn">${esc(f)}</span>`).join(' ')}</td></tr>`;
+  }).join('') + '</table>';
+}
+function renderReadList(){
+  $('readList').innerHTML = READS.length ? READS.map((r, i) => {
+    const nf = r.rows.filter(x => x.flags.length).length;
+    return `<div class="it" data-i="${i}"><span>${esc(r.payload)}${r.manual ? ' <span class="pill">codice a mano</span>' : ''}</span><span class="pill ${nf ? 'warn' : 'ok'}">${nf ? nf + ' da verificare' : 'ok'}</span></div>`;
+  }).join('') : '<p class="hint">Nessuna.</p>';
+  [...document.querySelectorAll('#readList .it')].forEach(el => el.onclick = () => { CUR = READS[+el.dataset.i]; showRead(CUR); window.scrollTo({top: 0}); });
+}
+
+/* ======================= LETTURE SALVATE E CLASSIFICA DI TAPPA ======================= */
+// di ogni scheda letta si salvano solo i voti (non la foto); rileggere la stessa scheda sostituisce la lettura precedente
+function saveReading(res){
+  const all = load('letture') || {};
+  all[res.payload] = {payload: res.payload, code: res.pl.code, sec: res.pl.sec, judge: res.pl.judge, kind: res.sh.kind, foglio: res.pl.foglio, at: res.at,
+    rows: res.rows.map(r => ({p: r.p, ass: r.ass, flags: r.flags.length, giri: r.giri.map(g => ({score: g.score, sync: g.sync, ae: !!g.ae, np: !!g.np}))}))};
+  store('letture', all);
+}
+// categorie dell'app delle classifiche di circuito
+const CAT_NOMI = {'istruttore-m':'Istruttori','istruttore-f':'Istruttrici','camminatore-m':'Camminatori','camminatore-f':'Camminatrici',
+  'coppia-istr':'Coppie Istruttori','coppia-camm':'Coppie Camminatori','coppia-miste':'Coppie Miste','':'Senza categoria'};
+function circuitCat(type, cat){
+  if (type !== 'IND') return {CC:'coppia-camm', II:'coppia-istr', CI:'coppia-miste'}[cat] || '';
+  const c = (cat||'').trim().toLowerCase();
+  return /^istruttric/.test(c) ? 'istruttore-f' : /^istrutt/.test(c) ? 'istruttore-m' : /^camminatric/.test(c) ? 'camminatore-f' : /^cammin/.test(c) ? 'camminatore-m' : '';
+}
+const campo = (a, re) => { for (const c of [].concat(a.campi || [])){ const e = Object.entries(c).find(([h]) => re.test(h)); if (e && e[1]) return e[1]; } return ''; };
+function computeClassifica(code){
+  const gara = (load('gare') || {})[code]; if (!gara) return null;
+  const L = Object.values(load('letture') || {}).filter(l => l.code === code), atl = {}, mancanti = [];
+  gara.sezioni.forEach(sec => {
+    const nf = Math.ceil(sec.atl.length / G.NR);
+    const judges = [...Array(gara.ng)].map((_, j) => 'G' + (j+1)).concat([...Array(gara.nc)].map((_, c) => 'C' + (c+1)));
+    for (let f = 1; f <= nf; f++) judges.forEach(j => { if (!L.some(l => l.sec === sec.idx && l.foglio === f && l.judge === j)) mancanti.push(`${sec.nome}${nf > 1 ? ' f.' + f : ''} ${j}`); });
+    sec.atl.forEach(a => atl[sec.idx + ':' + a.p] = {a, sec, campo: 0, capo: 0, n: 0, ass: false, verif: 0});
+  });
+  L.forEach(l => l.rows.forEach(r => {
+    const x = atl[l.sec + ':' + r.p]; if (!x) return;
+    x.n++; x.ass = x.ass || r.ass; x.verif += r.flags;
+    const v = r.giri.reduce((t, g) => t + (g.score || 0), 0);
+    if (l.kind === 'capo') x.capo += v; else x.campo += v;
+  }));
+  const cats = {};
+  Object.values(atl).forEach(x => {
+    if (x.ass || !x.n) return;
+    const cid = circuitCat(x.sec.type, x.a.cat), cop = x.sec.type !== 'IND', nomi = (x.a.nome || '').split(' / ');
+    const r = {p: x.a.p, cop, assoc: [...new Set([].concat(x.a.campi || []).map(c => campo({campi: c}, /asd|societ|squadra|club/i)).filter(Boolean))].join(' / '),
+      tot: x.campo, pts: Math.round((x.campo + x.capo/100) * 100) / 100, verif: x.verif};
+    if (cop){ r.p1 = nomi[0] || ''; r.p2 = nomi[1] || ''; }
+    else { r.cognome = campo(x.a, /^cognome/i) || nomi[0].split(' ')[0] || ''; r.nome = campo(x.a, /^nome$/i) || nomi[0].split(' ').slice(1).join(' '); }
+    (cats[cid] = cats[cid] || []).push(r);
+  });
+  Object.values(cats).forEach(a => { a.sort((x, y) => y.pts - x.pts); a.forEach((r, i) => r.pos = i && r.pts === a[i-1].pts ? a[i-1].pos : i + 1); });
+  return {gara, cats, mancanti, letture: L.length, verif: Object.values(atl).reduce((t, x) => t + x.verif, 0)};
+}
+function renderClassifica(){
+  const garas = load('gare') || {}, sel = $('cl-gara'), cur = sel.value || v('g-code').toUpperCase();
+  sel.innerHTML = Object.keys(garas).map(k => `<option value="${esc(k)}">${esc(garas[k].tappa || k)} · ${esc(k)}</option>`).join('');
+  if (garas[cur]) sel.value = cur;
+  const C = sel.value && computeClassifica(sel.value);
+  $('b-cl-pub').hidden = !(window.NWS_CIRCUITO && C && C.gara.stage);
+  if (!C){ $('cl-info').innerHTML = '<p class="hint">Nessuna gara: genera le schede nella scheda 1.</p>'; $('cl-tab').innerHTML = ''; return; }
+  const nm = C.mancanti.length;
+  $('cl-info').innerHTML = `<p>${C.letture} schede lette · ` + (nm ? `<span class="pill warn">${nm} schede mancanti</span> <small>${esc(C.mancanti.slice(0, 8).join(', '))}${nm > 8 ? '…' : ''}</small>` : '<span class="pill ok">tutte le schede lette</span>') +
+    (C.verif ? ` · <span class="pill warn">${C.verif} righe da verificare</span>` : '') + '</p>' + (nm ? '<p class="hint">Classifica parziale: si completa man mano che arrivano le schede.</p>' : '');
+  const order = Object.keys(CAT_NOMI);
+  $('cl-tab').innerHTML = Object.keys(C.cats).sort((a, b) => order.indexOf(a) - order.indexOf(b)).map(cid => {
+    const rows = C.cats[cid], cop = rows[0].cop;
+    return `<div class="card"><h2>${CAT_NOMI[cid]} <small style="color:var(--mute);font-weight:400">· ${rows.length}</small></h2><table class="res"><tr><th>Pos.</th><th>Pett.</th><th>${cop ? 'Coppia' : 'Atleta'}</th><th>ASD</th><th style="text-align:right">Tot. giudici</th><th style="text-align:right">Punti</th></tr>` +
+      rows.map(r => `<tr><td class="n">${r.pos}</td><td>${r.p}</td><td>${esc(cop ? r.p1 + ' / ' + r.p2 : r.cognome + ' ' + r.nome)}${r.verif ? ' <span class="pill warn">da verificare</span>' : ''}</td><td>${esc(r.assoc)}</td><td style="text-align:right">${r.tot}</td><td style="text-align:right"><b>${r.pts.toFixed(2)}</b></td></tr>`).join('') + '</table></div>';
+  }).join('') || '<div class="card"><p class="hint">Nessuna scheda letta per questa gara.</p></div>';
+}
+$('cl-gara').onchange = renderClassifica;
+$('b-cl-xls').onclick = async () => {
+  const C = computeClassifica(v('cl-gara')); if (!C) return;
+  try {
+    const X = await loadXLSX(), wb = X.utils.book_new();
+    Object.entries(C.cats).forEach(([cid, rows]) => {
+      const cop = rows[0].cop, aoa = [['POS', 'Pett.', ...(cop ? ['Partecipante 1', 'Partecipante 2'] : ['Cognome', 'Nome']), 'ASD', 'Tot. giudici', 'Punti']]
+        .concat(rows.map(r => [r.pos, r.p, ...(cop ? [r.p1, r.p2] : [r.cognome, r.nome]), r.assoc, r.tot, r.pts]));
+      X.utils.book_append_sheet(wb, X.utils.aoa_to_sheet(aoa), CAT_NOMI[cid].slice(0, 31));
+    });
+    X.writeFile(wb, `classifica_${v('cl-gara')}.xlsx`);
+  } catch(e){ $('cl-info').insertAdjacentHTML('beforeend', `<p class="hint">⚠ ${esc(e.message)}</p>`); }
+};
+// collegamento con l'app delle classifiche di circuito: stesso formato della tabella "risultati" (una riga per tappa e categoria)
+$('b-cl-pub').onclick = () => {
+  const C = computeClassifica(v('cl-gara')); if (!C || !window.NWS_CIRCUITO) return;
+  const n = NWS_CIRCUITO.publish(C.gara.stage, Object.entries(C.cats).filter(([cid]) => cid).map(([cid, rows]) => [cid,
+    rows.map(r => r.cop ? {pos: r.pos, p1: r.p1, p2: r.p2, assoc: r.assoc, tot: r.tot, pts: r.pts.toFixed(2)} : {pos: r.pos, cognome: r.cognome, nome: r.nome, assoc: r.assoc, tot: r.tot, pts: r.pts.toFixed(2)})]));
+  $('cl-info').insertAdjacentHTML('beforeend', `<p>✓ Pubblicate ${n} categorie. <a href="${NWS_CIRCUITO.link}">Apri le classifiche del circuito</a></p>`);
+};
+
+/* ======================= SCHEDE DI ESEMPIO (prova senza foto) ======================= */
+// compila una scheda come farebbe un giudice e la "fotografa" un po' storta: serve a provare lettura e classifica
+function hash01(x){ let h = 2166136261; for (const c of String(x)) h = Math.imul(h ^ c.charCodeAt(0), 16777619); return ((h >>> 0) % 10000) / 10000; }
+async function simulateSheet(sh, seed){
+  let st = (Math.floor(hash01(sh.payload + seed) * 2147483646) + 1);
+  const rnd = () => (st = (st * 16807) % 2147483647) / 2147483647, K = 10, L = layout(sh);
+  const svg = sheetSVG(sh).replace(`width="${G.W}mm" height="${G.H}mm"`, `width="${G.W*K}" height="${G.H*K}"`);
+  const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg); });
+  const c = document.createElement('canvas'); c.width = G.W*K; c.height = G.H*K;
+  const ctx = c.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height); ctx.drawImage(img, 0, 0);
+  const ink = () => rnd() < .5 ? 'rgba(20,25,60,.92)' : 'rgba(15,15,15,.9)';
+  const fill = b => { if (!b) return; ctx.fillStyle = ink(); ctx.beginPath(); const rr = b.r * (.8 + rnd()*.2);
+    if (b.sq) ctx.rect((b.cx-rr)*K, (b.cy-rr)*K, rr*2*K, rr*2*K); else ctx.ellipse(b.cx*K, b.cy*K, rr*K, rr*K*.95, rnd()*3, 0, Math.PI*2); ctx.fill(); };
+  const digits = (r, g, val) => L.boxes.filter(b => b.row === r && b.giro === g && b.key[0] === 'D').forEach((b, i) => {
+    ctx.fillStyle = ink(); ctx.font = `${b.h*.85*K}px sans-serif`; ctx.textAlign = 'center';
+    ctx.fillText(String(val).padStart(2, '0')[i], (b.x + b.w/2)*K, (b.y + b.h*.85)*K); });
+  const cop = sh.type !== 'IND';
+  sh.rows.forEach((row, r) => {
+    const B = L.bubbles.filter(b => b.row === r), skill = .35 + .6*hash01('abilita' + row.p);   // stesso atleta, voti simili tra giudici
+    if (hash01('assente' + row.p) < .04){ fill(B.find(b => b.key === 'ASS')); ctx.strokeStyle = ink(); ctx.lineWidth = 5; ctx.beginPath();
+      const y = (G.RY + r*G.RH + G.RH/2)*K; ctx.moveTo(40, y); ctx.lineTo(G.W*K - 70, y); ctx.stroke(); return; }
+    for (let g = 0; g < 2; g++){
+      const bg = B.filter(b => b.giro === g), q = Math.min(1, Math.max(0, skill + (rnd() - .5)*.25)); let score = 0;
+      const sync = () => { const y = Math.min(5, Math.max(1, Math.round(1 + q*4))); fill(bg.find(b => b.key === 'Y' + y)); return y; };
+      if (sh.kind === 'capo'){ const vv = Math.min(20, Math.max(0, Math.round(6 + q*14))); fill(bg.find(b => b.key === 'V' + vv)); score = vv + (cop ? sync() : 0); }
+      else if (rnd() < .03){ fill(bg.find(b => b.key === 'AE')); }
+      else if (sh.variant === 'B'){ ZB.forEach(([z, n]) => { const vz = Math.min(n, Math.max(0, Math.round(q*n))); fill(bg.find(b => b.key === 'Z' + z + vz)); score += vz; }); if (cop) score += sync(); }
+      else { bg.filter(b => /^[SCI]\d$/.test(b.key)).forEach(b => { if (rnd() < q){ fill(b); score++; } }); if (cop) score += sync(); }
+      digits(r, g, score);
+    }
+  });
+  // "foto": foglio leggermente ruotato su un tavolo
+  const ph = document.createElement('canvas'); ph.width = 3400; ph.height = 2500;
+  const p2 = ph.getContext('2d'); p2.fillStyle = '#4b5563'; p2.fillRect(0, 0, ph.width, ph.height);
+  p2.translate(ph.width/2, ph.height/2); p2.rotate((rnd() - .5) * .08); p2.drawImage(c, -c.width/2, -c.height/2);
+  return await new Promise(res => { const i = new Image(); i.onload = () => res(i); i.src = ph.toDataURL('image/jpeg', .85); });
+}
+async function demoSheets(all){
+  if (!SHEETS.length) $('b-gen').click();
+  const done = load('letture') || {}, todo = SHEETS.filter(sh => !done[sh.payload]);
+  if (!todo.length){ logm('Tutte le schede di questa gara sono già state lette: guarda la classifica (scheda 3).'); return; }
+  const list = all ? todo : todo.slice(0, 1);
+  $('b-demo1').disabled = $('b-demoall').disabled = true;
+  try {
+    for (let i = 0; i < list.length; i++){
+      logm(`Scheda di esempio ${i+1} di ${list.length}: ${list[i].payload}… (la prima volta carica il motore di lettura, ~10 MB)`);
+      const img = await simulateSheet(list[i], 'demo');
+      if (all && i < list.length - 1){ saveReading(await readSheet(img)); }
+      else await readOne('scheda di esempio', img);
+    }
+    if (all) logm(`✓ ${list.length} schede di esempio lette: guarda la classifica (scheda 3).`);
+  } catch(e){ logm('✗ ' + e.message); }
+  $('b-demo1').disabled = $('b-demoall').disabled = false;
+}
+$('b-demo1').onclick = () => demoSheets(false);
+$('b-demoall').onclick = () => demoSheets(true);
+
+/* ======================= NAV & PWA ======================= */
+document.querySelectorAll('#nav button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('#nav button').forEach(x => x.classList.toggle('on', x === b));
+  ['gara','leggi','class','info'].forEach(t => $('t-'+t).hidden = t !== b.dataset.t);
+  if (b.dataset.t === 'leggi') loadOpenCV().catch(() => {});
+  if (b.dataset.t === 'class') renderClassifica();
+});
+if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
+
+window.NWS = {layout, sheetSVG, buildSheets, parseSezioni, readSheet, parsePayload, makePayload, G, S, evaluate, ZB};
+</script>
+</body>
+</html>
