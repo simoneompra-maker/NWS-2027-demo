@@ -158,7 +158,8 @@ window.NWS_CIRCUITO = {
     <div class="card"><h2 id="sc-title">Scheda</h2>
       <div class="cv-wrap"><canvas id="cv"></canvas></div>
       <p class="hint">Verde = pieno · arancio = dubbio · blu = segnato a mano · grigio barrato = tolto a mano. Tocca un cerchio per correggerlo, toccalo di nuovo per annullare.</p></div>
-    <div class="card"><h2>Voti letti</h2><div id="sc-sum"></div><div id="sc-table"></div></div>
+    <div class="card"><h2>Voti letti</h2><div id="sc-sum"></div><div id="sc-table"></div>
+      <button class="btn sec" id="b-del" style="margin-top:12px">Elimina questa lettura</button></div>
   </div>
   <div class="card"><h2>Schede lette in questa sessione</h2><div class="list" id="readList"><p class="hint">Nessuna.</p></div></div>
 </section>
@@ -190,7 +191,7 @@ window.NWS_CIRCUITO = {
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
 <script>
 'use strict';
-const VERSION = '0.4.2';
+const VERSION = '0.4.4';
 document.getElementById('ver').textContent = VERSION;
 const OPENCV_URL = 'https://cdn.jsdelivr.net/npm/@techstark/opencv-js@4.10.0-release.1/dist/opencv.js';
 
@@ -311,7 +312,7 @@ function sheetSVG(sh){
   });
   o.push(qrPath(sh.payload, G.QR.x, G.QR.y, G.QR.s));
   // istruzioni
-  wrap(sh.ins, 232).slice(0, 2).forEach((l, i) => o.push(txt(13, 19.6 + i*2.3, l, {fs:1.7, fill:'#222'})));
+  o.push(txt(13, 21, sh.ins, {fs:2.6, fill:'#222'}));
   // intestazione pettorali
   o.push(`<rect x="${G.TX}" y="${G.TY}" width="${G.FIX[0]+G.FIX[1]}" height="${G.RY-G.TY}" fill="#fff" stroke="#777" stroke-width=".2"/>`);
   const ind = sh.type === 'IND';   // individuali: solo il pettorale, la categoria non si stampa
@@ -587,8 +588,8 @@ function buildSheets(gara){
     fogli.forEach((rows, fi) => {
       const p1 = rows[0].p, p2 = rows[rows.length-1].p;
       const gara1 = `${tipoLab} · ${sec.nome}${fogli.length > 1 ? ` · foglio ${fi+1}/${fogli.length}` : ''}`;
-      const corrIns = 'Correzione: X sul cerchio sbagliato, annerisci quello giusto e firma in "Sigla". Pettorale assente: barra tutta la riga e annerisci ASS.';
-      const commonIns = 'Totale/voto: sempre due cifre, una per quadratino (08, non 8). ' + corrIns;
+      // note sulla scheda: solo l'essenziale, su una riga (il resto si spiega al briefing)
+      const sync = sec.type !== 'IND' ? ' · sincronia: un solo voto' : '', corr = ' · correzione: X e firma in Sigla';
       const vB = gara.varCampo === 'B';
       for (let j = 1; j <= gara.ng; j++){
         const post1 = j, post2 = pairPost(j) <= gara.ng ? pairPost(j) : j;
@@ -597,15 +598,15 @@ function buildSheets(gara){
           title: sec.type === 'IND' ? 'GIUDICE DI CAMPO' : 'GIUDICE DI CAMPO · COPPIE', subtitle: `Giudice G${j}` + (vB ? ' · scheda a zone' : ''),
           post1, post2, prova1: gara.prove[post1-1] || `Prova ${post1}`, prova2: gara.prove[post2-1] || `Prova ${post2}`,
           meta: [['Tappa', gara.tappa, 30], ['Data', gara.data, 24], ['Gara', gara1, 62], ['Nome giudice', '', 40], ['Assenti al briefing', '', 40]],
-          ins: vB ? `Giudice di campo. Per ogni zona annerisci UN SOLO cerchio = elementi corretti: parti dal numero più alto e scendi di uno per ogni errore (0 = tutti errati). Nessuna zona vuota. AE = andatura sbagliata: solo il cerchio rosso. NP = non transitato. ${sec.type!=='IND'?'Sincronia: UN SOLO voto da 5 a 1 (con AE non si vota). ':''}2° giro: alla postazione indicata. ` + corrIns :
-               `Giudice di campo. Annerisci un cerchio per ogni elemento eseguito correttamente (1 punto ciascuno) e scrivi nel TOTALE quanti sono. AE = andatura sbagliata: solo il cerchio rosso. NP = non transitato. ${sec.type!=='IND'?'Sincronia: annerisci UN SOLO voto da 1 a 5 (con AE non si vota). ':''}2° giro: alla postazione indicata. ` + commonIns,
+          ins: vB ? 'Pennarello nero · un cerchio per zona' + sync + corr :
+               'Pennarello nero · un cerchio per elemento corretto · totale a due cifre (08)' + sync + corr,
           payload: makePayload(gara.code, sec2, 'G'+j+(vB ? 'B' : ''), fi+1, p1, p2)});
       }
       for (let c = 1; c <= gara.nc; c++){
         sheets.push({kind:'capo', type:sec.type, judge:'C'+c, sec:sec.idx, foglio:fi+1, rows,
           title: sec.type === 'IND' ? 'GIUDICE CAPO' : 'GIUDICE CAPO · COPPIE', subtitle: gara.nc > 1 ? `Giudice capo ${c}` : 'Giudice capo',
           meta: [['Tappa', gara.tappa, 30], ['Data', gara.data, 24], ['Gara', gara1, 62], ['Nome giudice capo', '', 40], ['Assenti al briefing', '', 40]],
-          ins: `Giudice capo. Per ogni pettorale e ogni giro annerisci UN SOLO cerchio da 0 a 20 e riscrivi il voto nel riquadro VOTO. ${sec.type!=='IND'?'Sincronia della coppia: annerisci UN SOLO voto da 1 a 5. ':''}` + commonIns,
+          ins: 'Pennarello nero · un solo voto per giro · voto a due cifre (08)' + sync + corr,
           payload: makePayload(gara.code, `${sec.idx}${sec.type}`, 'C'+c, fi+1, p1, p2)});
       }
     });
@@ -740,7 +741,7 @@ $('b-print').onclick = () => {
 /* ======================= LETTURA OTTICA ======================= */
 const S = 8;                    // pixel per mm dell'immagine raddrizzata
 const DARK = 0.55;              // soglia "inchiostro" rispetto al bianco carta locale
-const T_FULL = 0.42, T_DUB = 0.09;
+const T_FULL = 0.42, T_DUB = 0.09, T_ONE = 0.08;   // T_ONE: segno unico in un gruppo a scelta singola
 let cvReady = null;
 function loadOpenCV(){
   if (cvReady) return cvReady;
@@ -808,7 +809,10 @@ function findFiducials(cv, canvas){
     // il lato del quadrato deve essere ~6 mm su ~283 mm di base
     const expSide = Math.max(s1, s2) * 6 / 283, side = Math.sqrt(meanA);
     if (side < expSide * .45 || side > expSide * 2.2) continue;
-    const score = area;
+    // la combinazione più grande non basta: lo sfondo (tavolo, vestiti, fogli sotto) ha macchie scure.
+    // Si preferiscono 4 quadrati di dimensioni simili e con le proporzioni del foglio (283 × 196 mm tra i centri)
+    const spread = Math.max(...as) / Math.min(...as);
+    const score = area / (1 + 3*Math.abs(Math.log(ratio / (283/196)))) / Math.sqrt(spread);
     if (!best || score > best.score) best = {q, score};
   }
   return best ? best.q : null;
@@ -1053,6 +1057,15 @@ async function readSheet(img, manual){
     });
   }
   L.bubbles.forEach(b => b.state = b.fill >= T_FULL ? 'F' : b.fill >= T_DUB ? 'D' : 'E');
+  // gruppi in cui si sceglie UN SOLO cerchio (zone della scheda B, voto del capo, sincronia): un segno a biro
+  // riempie il cerchio solo in parte, ma se è l'unico netto del gruppo e gli altri sono puliti, è quello il voto
+  const grp = {};
+  L.bubbles.forEach(b => { const g = /^Z[SCI]/.test(b.key) ? b.key.slice(0, 2) : /^[VY]\d/.test(b.key) ? b.key[0] : null;
+    if (g) (grp[b.row + '|' + b.giro + '|' + g] = grp[b.row + '|' + b.giro + '|' + g] || []).push(b); });
+  Object.values(grp).forEach(bs => {
+    const s = bs.slice().sort((x, y) => y.fill - x.fill), a = s[0].fill, b2 = s[1] ? s[1].fill : 0;
+    if (s[0].state !== 'F' && a >= T_ONE && a >= 4*Math.max(b2, .01) && !bs.some(b => b.state === 'F')) s[0].state = 'F';
+  });
   const res = {pl, sh, L, warp, payload: qr, manual: isManual, orient: orient && {r: orient.r, gap: orient.gap}, at: new Date().toISOString()};
   evaluate(res);
   return res;
@@ -1211,7 +1224,7 @@ function digitImgs(res, r, g){
   }).join('');
 }
 function showRead(res){
-  $('scan').hidden = false;
+  $('scan').hidden = false; resetDel();
   const pl = res.pl;
   $('sc-title').textContent = `${pl.judge.startsWith('G') ? 'Giudice ' + pl.judge + (pl.variant === 'B' ? ' (zone)' : '') : 'Capo ' + pl.judge.slice(1)} · ${pl.type} · foglio ${pl.foglio} · ${pl.code}`;
   drawOverlay(res);
@@ -1229,6 +1242,19 @@ function showRead(res){
     return `<tr><td class="n">${r.p}<br><small>${chi}</small></td><td>${cell(0)}</td><td>${cell(1)}</td><td>${r.flags.map(f => `<span class="pill warn">${esc(f)}</span>`).join(' ')}</td></tr>`;
   }).join('') + '</table>';
 }
+// elimina la lettura mostrata: esce dall'elenco e dai voti salvati, quindi dalla classifica (doppio tocco per sicurezza)
+$('b-del').onclick = () => {
+  const btn = $('b-del');
+  if (!btn.dataset.ok){ btn.dataset.ok = 1; btn.textContent = 'Conferma eliminazione'; btn.style.background = 'var(--bad)'; btn.style.color = '#fff'; return; }
+  const i = READS.indexOf(CUR); if (i >= 0) READS.splice(i, 1);
+  const all = load('letture') || {}; if (CUR && all[CUR.payload] && all[CUR.payload].at === CUR.at){ delete all[CUR.payload]; store('letture', all);
+    const prev = READS.find(r => r.payload === CUR.payload); if (prev) saveReading(prev); }   // torna a valere la lettura precedente della stessa scheda
+  logm(`Lettura eliminata: ${CUR ? CUR.payload : ''}`);
+  CUR = READS[0] || null; resetDel();
+  if (CUR) showRead(CUR); else $('scan').hidden = true;
+  renderReadList();
+};
+function resetDel(){ const btn = $('b-del'); delete btn.dataset.ok; btn.textContent = 'Elimina questa lettura'; btn.style.background = ''; btn.style.color = ''; }
 function renderReadList(){
   $('readList').innerHTML = READS.length ? READS.map((r, i) => {
     const nf = r.rows.filter(x => x.flags.length).length;
