@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Valutazione demo NW Style 2027</title>
+<link rel="icon" href="giuria/icon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;800&family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet">
+<style>
+/* Layout: modulo in una colonna; ogni parte della demo è una riga con tre scelte e un commento */
+:root{--bg:#f3f4f1;--card:#ffffff;--ink:#16181a;--mute:#5d646b;--line:#dcdfdb;--red:#c8322a;--ok:#2e7d4f;--mid:#b7791f;--no:#9b2c2c;
+  --fh:"Barlow Condensed","Arial Narrow",Arial,sans-serif;--fb:"Source Sans 3",system-ui,-apple-system,"Segoe UI",sans-serif;color-scheme:light}
+@media (prefers-color-scheme:dark){:root{--bg:#141618;--card:#1d2023;--ink:#eceeed;--mute:#a3a9ae;--line:#33383c;--red:#ef5b52;--ok:#5cc28a;--mid:#e0b057;--no:#f08080;color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.5 var(--fb)}
+main{max-width:760px;margin:0 auto;padding:28px 16px 60px}
+h1{font-family:var(--fh);font-weight:800;font-size:38px;line-height:1.05;margin:0;text-wrap:balance}h1 span{color:var(--red)}
+.lead{color:var(--mute);margin:8px 0 22px}
+label.t{display:block;font-weight:600;margin-bottom:4px}
+input[type=text],textarea{width:100%;font:inherit;font-size:16px;padding:9px 11px;border:1px solid var(--line);border-radius:9px;background:var(--card);color:var(--ink)}
+textarea{min-height:64px;resize:vertical}
+.item{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin:12px 0;display:grid;gap:8px}
+.item b{font-family:var(--fh);font-size:22px;letter-spacing:.3px}.item small{color:var(--mute)}
+.choice{display:flex;gap:8px;flex-wrap:wrap}
+.choice label{display:flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:99px;padding:5px 12px;cursor:pointer;font-size:15px}
+.choice input{accent-color:var(--red)}
+.choice label:has(input:checked){border-color:currentColor;font-weight:600}
+.choice label.ok:has(input:checked){color:var(--ok)}.choice label.mid:has(input:checked){color:var(--mid)}.choice label.no:has(input:checked){color:var(--no)}
+.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}
+button,a.btn{font:inherit;font-weight:600;border:0;border-radius:10px;padding:11px 16px;cursor:pointer;text-decoration:none;display:inline-block}
+.primary{background:var(--red);color:#fff}.sec{background:var(--card);color:var(--ink);border:1px solid var(--line)!important}
+button:focus-visible,a.btn:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--red);outline-offset:2px}
+#msg{color:var(--mute);margin-top:10px;min-height:1.5em}
+pre{white-space:pre-wrap;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px;font-size:14px;max-height:260px;overflow:auto}
+a{color:var(--red)}
+</style>
+</head>
+<body>
+<main>
+  <p><a href="./">← Presentazione della demo</a></p>
+  <h1>La tua <span>valutazione</span></h1>
+  <p class="lead">Dopo aver provato la demo, dai un giudizio a ogni parte e aggiungi un commento se vuoi. Alla fine invia il testo con WhatsApp o copialo.</p>
+
+  <label class="t" for="nome">Il tuo nome</label>
+  <input type="text" id="nome" autocomplete="name" placeholder="Nome e cognome">
+
+  <div id="items"></div>
+
+  <label class="t" for="altro" style="margin-top:16px">Altre osservazioni, cose che mancano</label>
+  <textarea id="altro"></textarea>
+
+  <div class="actions">
+    <button class="primary" id="share">Invia o condividi</button>
+    <a class="btn sec" id="wa" href="#" target="_blank" rel="noopener">Invia con WhatsApp</a>
+    <button class="sec" id="copy">Copia il testo</button>
+  </div>
+  <p id="msg"></p>
+  <pre id="preview" hidden></pre>
+</main>
+<script>
+var PARTI = [
+  ['Iscritti da Excel', 'Carica atleti dal file delle iscrizioni, con categoria, ASD e partenza'],
+  ['Pettorali e manche', 'Assegnazione automatica rispettando Gruppo 1, Gruppo 2 e indifferenti'],
+  ['Schede dei giudici', 'Schede stampate con QR, una per giudice e per manche'],
+  ['Lettura con il telefono', 'Foto della scheda, voti letti e segnalazione delle righe da verificare'],
+  ['Classifica di tappa', 'Classifica per categoria calcolata dai voti (formula ancora provvisoria)'],
+  ['Collegamento al circuito', 'La classifica di tappa passa direttamente nelle classifiche del circuito'],
+  ['Archivio comune e accessi (proposta)', 'Comitato, giudici e pubblico; al pubblico solo il punteggio totale']
+];
+var GIUDIZI = [['ok', 'Utile'], ['mid', 'Da rivedere'], ['no', 'Non serve']];
+var box = document.getElementById('items');
+PARTI.forEach(function(p, i){
+  var d = document.createElement('div'); d.className = 'item';
+  d.innerHTML = '<div><b></b><br><small></small></div><div class="choice" role="radiogroup"></div><textarea aria-label="Commento" placeholder="Commento (facoltativo)"></textarea>';
+  d.querySelector('b').textContent = p[0]; d.querySelector('small').textContent = p[1];
+  d.querySelector('textarea').id = 'c' + i;
+  var ch = d.querySelector('.choice'); ch.setAttribute('aria-label', p[0]);
+  GIUDIZI.forEach(function(g){
+    var l = document.createElement('label'); l.className = g[0];
+    l.innerHTML = '<input type="radio" name="g' + i + '" value="' + g[1] + '"> ' + g[1];
+    ch.appendChild(l);
+  });
+  box.appendChild(d);
+});
+// bozza ricordata nel browser, così chi chiude la pagina non perde quello che ha scritto
+var KEY = 'nws2027demo_valutazione';
+function save(){ try { var s = {nome: v('nome'), altro: v('altro'), parti: PARTI.map(function(_, i){ var r = document.querySelector('input[name=g' + i + ']:checked'); return [r ? r.value : '', v('c' + i)]; })}; localStorage.setItem(KEY, JSON.stringify(s)); } catch(e){} }
+function v(id){ return document.getElementById(id).value.trim(); }
+try { var s = JSON.parse(localStorage.getItem(KEY)); if (s){ document.getElementById('nome').value = s.nome || ''; document.getElementById('altro').value = s.altro || '';
+  (s.parti || []).forEach(function(x, i){ if (x[0]){ var r = document.querySelector('input[name=g' + i + '][value="' + x[0] + '"]'); if (r) r.checked = true; } document.getElementById('c' + i).value = x[1] || ''; }); } } catch(e){}
+document.addEventListener('input', save); document.addEventListener('change', save);
+function testo(){
+  var out = ['Valutazione demo NW Style 2027' + (v('nome') ? ' · ' + v('nome') : ''), ''];
+  PARTI.forEach(function(p, i){
+    var r = document.querySelector('input[name=g' + i + ']:checked'), c = v('c' + i);
+    out.push('• ' + p[0] + ': ' + (r ? r.value : '—') + (c ? '\n  ' + c : ''));
+  });
+  if (v('altro')) out.push('', 'Altro: ' + v('altro'));
+  return out.join('\n');
+}
+function show(m){ document.getElementById('msg').textContent = m; var p = document.getElementById('preview'); p.textContent = testo(); p.hidden = false; }
+document.getElementById('wa').addEventListener('click', function(){ this.href = 'https://wa.me/?text=' + encodeURIComponent(testo()); });
+document.getElementById('share').addEventListener('click', function(){
+  var t = testo();
+  if (navigator.share) navigator.share({title: 'Valutazione demo NW Style 2027', text: t}).catch(function(){});
+  else { copia(t); }
+});
+document.getElementById('copy').addEventListener('click', function(){ copia(testo()); });
+function copia(t){
+  if (navigator.clipboard) navigator.clipboard.writeText(t).then(function(){ show('Testo copiato: incollalo in un messaggio o in una mail.'); }, function(){ show('Seleziona il testo qui sotto e copialo.'); });
+  else show('Seleziona il testo qui sotto e copialo.');
+}
+</script>
+</body>
+</html>
