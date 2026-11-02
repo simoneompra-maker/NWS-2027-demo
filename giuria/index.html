@@ -1376,7 +1376,7 @@ document.querySelectorAll('#nav button').forEach(b => b.onclick = () => {
   if (b.dataset.t === 'leggi') loadOpenCV().catch(() => {});
   if (b.dataset.t === 'class') renderClassifica();
 });
-if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
+if (false)   /* demo: niente cache offline */ navigator.serviceWorker.register('sw.js').catch(() => {});
 
 window.NWS = {layout, sheetSVG, buildSheets, parseSezioni, readSheet, parsePayload, makePayload, G, S, evaluate, ZB};
 </script>
