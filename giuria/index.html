@@ -90,7 +90,7 @@ window.NWS_CIRCUITO = {
       <div><label>Giudici capo</label><input id="g-nc" type="number" min="1" max="3" value="1"></div>
       <div style="grid-column:1/-1"><label>Decimali per le parità (in quest'ordine)</label>
         <div class="row" id="g-dec"><span class="pill">1° Giudice capo · totale</span></div>
-        <p class="hint">Punti = somma dei giudici di campo, poi a coppie di cifre il capo e i giudici scelti: es. 87,351412.</p></div>
+        <p class="hint">Punti = somma di tutti i giudici, poi a coppie di cifre il capo e i giudici scelti: es. 87,351412. Il criterio non compare in classifica.</p></div>
       <div id="g-stage-box" hidden><label for="g-stage">Tappa del circuito</label><select id="g-stage"></select></div>
       <div><label>Scheda giudici di campo</label><select id="g-var"><option value="A">A · elementi (1 punto ciascuno)</option><option value="B">B · zone (un cerchio per zona)</option></select></div>
     </div>
@@ -194,7 +194,7 @@ window.NWS_CIRCUITO = {
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
 <script>
 'use strict';
-const VERSION = '0.5.1';
+const VERSION = '0.5.2';
 document.getElementById('ver').textContent = VERSION;
 const OPENCV_URL = 'https://cdn.jsdelivr.net/npm/@techstark/opencv-js@4.10.0-release.1/dist/opencv.js';
 
@@ -1328,7 +1328,7 @@ function computeClassifica(code){
     x.n++; x.ass = x.ass || r.ass; x.verif += r.flags;
     const gs = r.giri.map(g => g.score || 0);
     x.J[l.judge] = [(x.J[l.judge] || [0, 0])[0] + gs[0], (x.J[l.judge] || [0, 0])[1] + gs[1]];   // voti di ogni giudice, per giro
-    if (l.kind !== 'capo') x.campo += gs[0] + gs[1];
+    x.campo += gs[0] + gs[1];   // Tot. giudici: tutti i giudici, capo compreso
   }));
   const cats = {};
   Object.values(atl).forEach(x => {
@@ -1355,8 +1355,8 @@ function renderClassifica(){
   const C = sel.value && computeClassifica(sel.value);
   $('b-cl-pub').hidden = !(window.NWS_CIRCUITO && C && C.gara.stage);
   if (!C){ $('cl-info').innerHTML = '<p class="hint">Nessuna gara: genera le schede nella scheda 1.</p>'; $('cl-tab').innerHTML = ''; return; }
-  const dn = (C.gara.decimali || [{j: 'C1', g: 'tot'}]).map(d => (d.j === 'C1' ? 'capo' : d.j) + (d.g === '1' ? ' (1° giro)' : d.g === '2' ? ' (2° giro)' : ''));
-  $('cl-formula').innerHTML = `<b>Tot. giudici</b> = somma dei giudici di campo nei due giri · <b>decimali</b>, a coppie di cifre: ${esc(dn.join(' → '))}`;
+  // il criterio dei decimali resta nei dati della gara: in classifica compaiono solo i punti
+  $('cl-formula').innerHTML = '<b>Tot. giudici</b> = somma dei voti di tutti i giudici, capo compreso, nei due giri · i decimali risolvono le parità.';
   const nm = C.mancanti.length;
   $('cl-info').innerHTML = `<p>${C.letture} schede lette · ` + (nm ? `<span class="pill warn">${nm} schede mancanti</span> <small>${esc(C.mancanti.slice(0, 8).join(', '))}${nm > 8 ? '…' : ''}</small>` : '<span class="pill ok">tutte le schede lette</span>') +
     (C.verif ? ` · <span class="pill warn">${C.verif} righe da verificare</span>` : '') + '</p>' + (nm ? '<p class="hint">Classifica parziale: si completa man mano che arrivano le schede.</p>' : '');
