@@ -88,6 +88,9 @@ window.NWS_CIRCUITO = {
       <div><label>Data</label><input id="g-data" value="12/09/2026"></div>
       <div><label>Giudici di campo</label><input id="g-ng" type="number" min="1" max="12" value="6"></div>
       <div><label>Giudici capo</label><input id="g-nc" type="number" min="1" max="3" value="1"></div>
+      <div style="grid-column:1/-1"><label>Decimali per le parità (in quest'ordine)</label>
+        <div class="row" id="g-dec"><span class="pill">1° Giudice capo · totale</span></div>
+        <p class="hint">Punti = somma dei giudici di campo, poi a coppie di cifre il capo e i giudici scelti: es. 87,351412.</p></div>
       <div id="g-stage-box" hidden><label for="g-stage">Tappa del circuito</label><select id="g-stage"></select></div>
       <div><label>Scheda giudici di campo</label><select id="g-var"><option value="A">A · elementi (1 punto ciascuno)</option><option value="B">B · zone (un cerchio per zona)</option></select></div>
     </div>
@@ -171,7 +174,7 @@ window.NWS_CIRCUITO = {
       <button class="btn sec" id="b-cl-xls">Scarica Excel</button>
       <button class="btn" id="b-cl-pub" hidden>Pubblica nelle classifiche del circuito</button>
     </div>
-    <p class="hint">Formula provvisoria, da confermare: <b>Tot. giudici</b> = somma dei voti dei giudici di campo nei due giri; <b>Punti</b> = Tot. giudici + voti del giudice capo ÷ 100.</p>
+    <p class="hint" id="cl-formula"></p>
     <div id="cl-info" style="margin-top:10px"></div>
   </div>
   <div id="cl-tab"></div>
@@ -191,7 +194,7 @@ window.NWS_CIRCUITO = {
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
 <script>
 'use strict';
-const VERSION = '0.5.0';
+const VERSION = '0.5.1';
 document.getElementById('ver').textContent = VERSION;
 const OPENCV_URL = 'https://cdn.jsdelivr.net/npm/@techstark/opencv-js@4.10.0-release.1/dist/opencv.js';
 
@@ -563,6 +566,20 @@ function assignBibs(){
     (cop.length ? ` · coppie: ${pc.length} pettorali dal file` + (cop.some(r => !parseInt(r[ip], 10)) ? ' ⚠ alcune coppie senza pettorale' : '') : '') +
     (g1.length > cap1 ? ` · il Gruppo 1 sfora nella 3ª manche` : '') + (sizes.some(n => n > G.NR) ? ` · le manche oltre ${G.NR} atleti si stampano su due fogli` : '');
 }
+/* decimali per le parità: capo sempre primo, poi fino a 4 giudici a scelta (totale, solo 1° o solo 2° giro) */
+const NDEC = 4, DEC_GIRO = [['tot', 'totale'], ['1', 'solo 1° giro'], ['2', 'solo 2° giro']];
+function renderDec(){
+  const box = $('g-dec'), prev = [...Array(NDEC)].map((_, i) => [$('g-dj' + i) ? $('g-dj' + i).value : '', $('g-dg' + i) ? $('g-dg' + i).value : 'tot']);
+  const ng = Math.max(1, +v('g-ng') || 6);
+  box.innerHTML = '<span class="pill">1° Giudice capo · totale</span>' + prev.map((_, i) =>
+    `<span style="display:inline-flex;gap:4px;align-items:center"><b style="font-size:13px">${i+2}°</b>` +
+    `<select id="g-dj${i}" style="width:auto"><option value="">—</option>${[...Array(ng)].map((_, j) => `<option value="G${j+1}">G${j+1}</option>`).join('')}</select>` +
+    `<select id="g-dg${i}" style="width:auto">${DEC_GIRO.map(([k, t]) => `<option value="${k}">${t}</option>`).join('')}</select></span>`).join('');
+  prev.forEach(([j, g], i) => { $('g-dj' + i).value = j; $('g-dg' + i).value = g; });
+}
+function readDec(){
+  return [{j: 'C1', g: 'tot'}].concat([...Array(NDEC)].map((_, i) => ({j: v('g-dj' + i), g: v('g-dg' + i)})).filter(d => d.j));
+}
 function readGara(){
   const sezioni = parseSezioni(v('g-sez')), A = parseAtleti(v('g-atl'), v('g-colp'), v('g-colc'));
   if (A && A.ip < 0) throw new Error('Atleti: scegli quale colonna contiene il pettorale');
@@ -583,6 +600,7 @@ function readGara(){
     ng: Math.max(1, +v('g-ng')||6), nc: Math.max(1, +v('g-nc')||1), varCampo: v('g-var') === 'B' ? 'B' : 'A',
     prove: v('g-prove').split('\n').map(s=>s.trim()).filter(Boolean),
     stage: v('g-stage') || '',
+    decimali: readDec(),
     sezioni
   };
 }
@@ -636,12 +654,14 @@ if (window.NWS_CIRCUITO){
 }
 (function initGara(){
   const s = load('form');
+  renderDec(); $('g-ng').addEventListener('input', renderDec);
   $('g-prove').value = DEF_PROVE.join('\n'); $('g-sez').value = DEF_SEZ;
   if (s) Object.entries(s).forEach(([k, val]) => { if ($(k)) $(k).value = val; });
+  renderDec();    // giudici disponibili secondo il numero salvato, mantenendo le scelte
   atlPreview();   // riempie i menu delle colonne, poi rimette la scelta salvata
   if (s){ $('g-colp').value = s['g-colp'] || ''; $('g-colc').value = s['g-colc'] || ''; atlPreview(); }
 })();
-function saveForm(){ const f = {}; ['g-tappa','g-code','g-data','g-ng','g-nc','g-var','g-prove','g-sez','g-atl','g-colp','g-colc','g-p1','g-ord','g-man','g-max','g-stage'].forEach(k => f[k] = v(k)); store('form', f); }
+function saveForm(){ const f = {}; ['g-tappa','g-code','g-data','g-ng','g-nc','g-var','g-prove','g-sez','g-atl','g-colp','g-colc','g-p1','g-ord','g-man','g-max','g-stage', ...[...Array(NDEC)].flatMap((_, i) => ['g-dj' + i, 'g-dg' + i])].forEach(k => f[k] = v(k)); store('form', f); }
 /* anteprima dell'elenco atleti: colonne riconosciute e menu per sceglierle a mano */
 function atlPreview(){
   const cp = v('g-colp'), cc = v('g-colc'), A = parseAtleti(v('g-atl'), cp, cc);
@@ -1301,25 +1321,31 @@ function computeClassifica(code){
     const nf = Math.ceil(sec.atl.length / G.NR);
     const judges = [...Array(gara.ng)].map((_, j) => 'G' + (j+1)).concat([...Array(gara.nc)].map((_, c) => 'C' + (c+1)));
     for (let f = 1; f <= nf; f++) judges.forEach(j => { if (!L.some(l => l.sec === sec.idx && l.foglio === f && l.judge === j)) mancanti.push(`${sec.nome}${nf > 1 ? ' f.' + f : ''} ${j}`); });
-    sec.atl.forEach(a => atl[sec.idx + ':' + a.p] = {a, sec, campo: 0, capo: 0, n: 0, ass: false, verif: 0});
+    sec.atl.forEach(a => atl[sec.idx + ':' + a.p] = {a, sec, campo: 0, n: 0, ass: false, verif: 0, J: {}});
   });
   L.forEach(l => l.rows.forEach(r => {
     const x = atl[l.sec + ':' + r.p]; if (!x) return;
     x.n++; x.ass = x.ass || r.ass; x.verif += r.flags;
-    const v = r.giri.reduce((t, g) => t + (g.score || 0), 0);
-    if (l.kind === 'capo') x.capo += v; else x.campo += v;
+    const gs = r.giri.map(g => g.score || 0);
+    x.J[l.judge] = [(x.J[l.judge] || [0, 0])[0] + gs[0], (x.J[l.judge] || [0, 0])[1] + gs[1]];   // voti di ogni giudice, per giro
+    if (l.kind !== 'capo') x.campo += gs[0] + gs[1];
   }));
   const cats = {};
   Object.values(atl).forEach(x => {
     if (x.ass || !x.n) return;
     const cid = circuitCat(x.sec.type, x.a.cat), cop = x.sec.type !== 'IND', nomi = (x.a.nome || '').split(' / ');
     const r = {p: x.a.p, cop, assoc: [...new Set([].concat(x.a.campi || []).map(c => campo({campi: c}, /asd|societ|squadra|club/i)).filter(Boolean))].join(' / '),
-      tot: x.campo, pts: Math.round((x.campo + x.capo/100) * 100) / 100, verif: x.verif};
+      tot: x.campo, verif: x.verif};
+    // decimali: a coppie di cifre, nell'ordine scelto per la gara (capo per primo)
+    r.dec = (gara.decimali || [{j: 'C1', g: 'tot'}]).map(d => { const s = x.J[d.j] || [0, 0]; return Math.min(99, d.g === '1' ? s[0] : d.g === '2' ? s[1] : s[0] + s[1]); });
+    r.ptsTxt = r.tot + (r.dec.length ? ',' + r.dec.map(n => String(n).padStart(2, '0')).join('') : '');
     if (cop){ r.p1 = nomi[0] || ''; r.p2 = nomi[1] || ''; }
     else { r.cognome = campo(x.a, /^cognome/i) || nomi[0].split(' ')[0] || ''; r.nome = campo(x.a, /^nome$/i) || nomi[0].split(' ').slice(1).join(' '); }
     (cats[cid] = cats[cid] || []).push(r);
   });
-  Object.values(cats).forEach(a => { a.sort((x, y) => y.pts - x.pts); a.forEach((r, i) => r.pos = i && r.pts === a[i-1].pts ? a[i-1].pos : i + 1); });
+  // ordine: Tot. giudici, poi i decimali uno dopo l'altro; pari solo se coincidono tutti
+  const key = r => [r.tot].concat(r.dec), cmp = (x, y) => { const a = key(x), b = key(y); for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return b[i] - a[i]; return 0; };
+  Object.values(cats).forEach(a => { a.sort(cmp); a.forEach((r, i) => r.pos = i && !cmp(r, a[i-1]) ? a[i-1].pos : i + 1); });
   return {gara, cats, mancanti, letture: L.length, verif: Object.values(atl).reduce((t, x) => t + x.verif, 0)};
 }
 function renderClassifica(){
@@ -1329,6 +1355,8 @@ function renderClassifica(){
   const C = sel.value && computeClassifica(sel.value);
   $('b-cl-pub').hidden = !(window.NWS_CIRCUITO && C && C.gara.stage);
   if (!C){ $('cl-info').innerHTML = '<p class="hint">Nessuna gara: genera le schede nella scheda 1.</p>'; $('cl-tab').innerHTML = ''; return; }
+  const dn = (C.gara.decimali || [{j: 'C1', g: 'tot'}]).map(d => (d.j === 'C1' ? 'capo' : d.j) + (d.g === '1' ? ' (1° giro)' : d.g === '2' ? ' (2° giro)' : ''));
+  $('cl-formula').innerHTML = `<b>Tot. giudici</b> = somma dei giudici di campo nei due giri · <b>decimali</b>, a coppie di cifre: ${esc(dn.join(' → '))}`;
   const nm = C.mancanti.length;
   $('cl-info').innerHTML = `<p>${C.letture} schede lette · ` + (nm ? `<span class="pill warn">${nm} schede mancanti</span> <small>${esc(C.mancanti.slice(0, 8).join(', '))}${nm > 8 ? '…' : ''}</small>` : '<span class="pill ok">tutte le schede lette</span>') +
     (C.verif ? ` · <span class="pill warn">${C.verif} righe da verificare</span>` : '') + '</p>' + (nm ? '<p class="hint">Classifica parziale: si completa man mano che arrivano le schede.</p>' : '');
@@ -1336,7 +1364,7 @@ function renderClassifica(){
   $('cl-tab').innerHTML = Object.keys(C.cats).sort((a, b) => order.indexOf(a) - order.indexOf(b)).map(cid => {
     const rows = C.cats[cid], cop = rows[0].cop;
     return `<div class="card"><h2>${CAT_NOMI[cid]} <small style="color:var(--mute);font-weight:400">· ${rows.length}</small></h2><table class="res"><tr><th>Pos.</th><th>Pett.</th><th>${cop ? 'Coppia' : 'Atleta'}</th><th>ASD</th><th style="text-align:right">Tot. giudici</th><th style="text-align:right">Punti</th></tr>` +
-      rows.map(r => `<tr><td class="n">${r.pos}</td><td>${r.p}</td><td>${esc(cop ? r.p1 + ' / ' + r.p2 : r.cognome + ' ' + r.nome)}${r.verif ? ' <span class="pill warn">da verificare</span>' : ''}</td><td>${esc(r.assoc)}</td><td style="text-align:right">${r.tot}</td><td style="text-align:right"><b>${r.pts.toFixed(2)}</b></td></tr>`).join('') + '</table></div>';
+      rows.map(r => `<tr><td class="n">${r.pos}</td><td>${r.p}</td><td>${esc(cop ? r.p1 + ' / ' + r.p2 : r.cognome + ' ' + r.nome)}${r.verif ? ' <span class="pill warn">da verificare</span>' : ''}</td><td>${esc(r.assoc)}</td><td style="text-align:right">${r.tot}</td><td style="text-align:right"><b>${r.ptsTxt}</b></td></tr>`).join('') + '</table></div>';
   }).join('') || '<div class="card"><p class="hint">Nessuna scheda letta per questa gara.</p></div>';
 }
 $('cl-gara').onchange = renderClassifica;
@@ -1346,7 +1374,7 @@ $('b-cl-xls').onclick = async () => {
     const X = await loadXLSX(), wb = X.utils.book_new();
     Object.entries(C.cats).forEach(([cid, rows]) => {
       const cop = rows[0].cop, aoa = [['POS', 'Pett.', ...(cop ? ['Partecipante 1', 'Partecipante 2'] : ['Cognome', 'Nome']), 'ASD', 'Tot. giudici', 'Punti']]
-        .concat(rows.map(r => [r.pos, r.p, ...(cop ? [r.p1, r.p2] : [r.cognome, r.nome]), r.assoc, r.tot, r.pts]));
+        .concat(rows.map(r => [r.pos, r.p, ...(cop ? [r.p1, r.p2] : [r.cognome, r.nome]), r.assoc, r.tot, r.ptsTxt]));
       X.utils.book_append_sheet(wb, X.utils.aoa_to_sheet(aoa), CAT_NOMI[cid].slice(0, 31));
     });
     X.writeFile(wb, `classifica_${v('cl-gara')}.xlsx`);
@@ -1356,7 +1384,7 @@ $('b-cl-xls').onclick = async () => {
 $('b-cl-pub').onclick = () => {
   const C = computeClassifica(v('cl-gara')); if (!C || !window.NWS_CIRCUITO) return;
   const n = NWS_CIRCUITO.publish(C.gara.stage, Object.entries(C.cats).filter(([cid]) => cid).map(([cid, rows]) => [cid,
-    rows.map(r => r.cop ? {pos: r.pos, p1: r.p1, p2: r.p2, assoc: r.assoc, tot: r.tot, pts: r.pts.toFixed(2)} : {pos: r.pos, cognome: r.cognome, nome: r.nome, assoc: r.assoc, tot: r.tot, pts: r.pts.toFixed(2)})]));
+    rows.map(r => r.cop ? {pos: r.pos, p1: r.p1, p2: r.p2, assoc: r.assoc, tot: r.tot, pts: r.ptsTxt.replace(',', '.')} : {pos: r.pos, cognome: r.cognome, nome: r.nome, assoc: r.assoc, tot: r.tot, pts: r.ptsTxt.replace(',', '.')})]));
   $('cl-info').insertAdjacentHTML('beforeend', `<p>✓ Pubblicate ${n} categorie. <a href="${NWS_CIRCUITO.link}">Apri le classifiche del circuito</a></p>`);
 };
 
