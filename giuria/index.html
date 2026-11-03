@@ -191,7 +191,7 @@ window.NWS_CIRCUITO = {
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
 <script>
 'use strict';
-const VERSION = '0.4.4';
+const VERSION = '0.5.0';
 document.getElementById('ver').textContent = VERSION;
 const OPENCV_URL = 'https://cdn.jsdelivr.net/npm/@techstark/opencv-js@4.10.0-release.1/dist/opencv.js';
 
@@ -211,9 +211,11 @@ const ZB = [['S', 2, 'piede-bacino-spalle · sguardo avanti'],
 const ZBN = {S:'SUPERIORE', C:'CENTRALE', I:'INFERIORE', K:'SINCRONIA'};
 const NUM_COL = '#4a4a4a';      // colore dei numeri stampati dentro i cerchi
 const G = {W:297,H:210,FID:6,FIDP:[[4,4],[287,4],[4,200],[287,200]],TX:4,TW:289,TY:24,H1:4.6,H2:3.2,H3:14,RH:6.0,NR:25,
-           FIX:[10,6,6.5],QR:{x:265,y:3.4,s:14},R:2.1};
+           FIX:[10,6,6.5],QR:{x:265,y:3.4,s:14},R:2.4};
 G.RY = G.TY + G.H1 + G.H2 + G.H3;                // 45.8
-G.GW = (G.TW - G.FIX.reduce((a,b)=>a+b,0)) / 2;   // larghezza di un giro
+G.PB = G.FIX[0] + G.FIX[1];                      // colonna pettorali, ripetuta prima del 2° giro
+G.GW = (G.TW - G.FIX.reduce((a,b)=>a+b,0) - G.PB) / 2;   // larghezza di un giro
+const giroX = g => G.TX + G.FIX[0] + G.FIX[1] + G.FIX[2] + g*(G.GW + G.PB);
 G.FC = G.FIDP.map(([x,y]) => [x + G.FID/2, y + G.FID/2]); // centri dei riferimenti
 
 function pairPost(p){ return p % 2 ? p + 1 : p - 1; }
@@ -230,29 +232,26 @@ function layout(sh){
     L.bubbles.push({row:r, giro:-1, key:'ASS', cx:assX, cy, r:G.R});
   }
   for (let g = 0; g < 2; g++){
-    const x0 = g0x + g*G.GW;
+    const x0 = giroX(g);
     let units;
     if (sh.kind === 'campo' && sh.variant === 'B'){
       units = [{k:'AE',u:1,t:'b'}];
-      ZB.forEach(([z, n]) => { for (let v = n; v >= 0; v--) units.push({k:'Z'+z+v,u:1,t:'b',z,val:v}); });
-      if (coppie) SYNC.slice().reverse().forEach(n => units.push({k:'Y'+n,u:1,t:'b',z:'K',val:n}));
-      units.push({k:'NP',u:1,t:'q'}, {k:'SG',u:.85,t:'s'});
+      ZB.forEach(([z, n]) => { for (let v = 0; v <= n; v++) units.push({k:'Z'+z+v,u:1,t:'b',z,val:v}); });
+      if (coppie) SYNC.forEach(n => units.push({k:'Y'+n,u:1,t:'b',z:'K',val:n}));
       const cw = G.GW / units.reduce((a,b)=>a+b.u,0);
       let x = x0; units.forEach(u => { u.x = x; u.w = u.u*cw; x += u.w; });
     } else if (sh.kind === 'campo'){
       units = [{k:'AE',u:1,t:'b'}].concat(TEC.map(i=>({k:i[0],u:1,t:'b',z:i[2],lab:i[1]})),
               coppie ? SYNC.map(n => ({k:'Y'+n,u:1,t:'b',z:'K',val:n})) : [],
-              [{k:'D1',u:1,t:'d'},{k:'D2',u:1,t:'d'},{k:'NP',u:1,t:'q'},{k:'SG',u:.85,t:'s'}]);
+              [{k:'D1',u:1,t:'d'},{k:'D2',u:1,t:'d'}]);
       const cw = G.GW / units.reduce((a,b)=>a+b.u,0);
       let x = x0; units.forEach(u => { u.x = x; u.w = u.u*cw; x += u.w; });
     } else {
-      const ns = coppie ? 5 : 0, kw = 5, dg = 6, sg = 5.2;
-      const vw = G.GW - ns*kw - 2*dg - sg;
+      const ns = coppie ? 5 : 0, kw = 5.4;
+      const vw = G.GW - ns*kw;
       units = [{k:'V',x:x0,w:vw,t:'v'}];
       let x = x0 + vw;
       if (coppie) SYNC.forEach(n => { units.push({k:'Y'+n,x,w:kw,t:'b',z:'K',val:n}); x += kw; });
-      units.push({k:'D1',x,w:dg,t:'d'}); x += dg; units.push({k:'D2',x,w:dg,t:'d'}); x += dg;
-      units.push({k:'SG',x,w:sg,t:'s'});
     }
     L.cols.push(units);
     for (let r = 0; r < G.NR; r++){
@@ -295,7 +294,7 @@ function qrPath(data, x, y, s){
 
 function sheetSVG(sh){
   const L = layout(sh), coppie = sh.type !== 'IND', o = [];
-  const tot = G.RY + G.NR*G.RH, g0x = G.TX + G.FIX[0] + G.FIX[1] + G.FIX[2];
+  const tot = G.RY + G.NR*G.RH, g0x = giroX(0), p2x = giroX(0) + G.GW;   // p2x: pettorali ripetuti
   o.push(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${G.W} ${G.H}" width="${G.W}mm" height="${G.H}mm" font-family="DejaVu Sans, Arial, Helvetica, sans-serif">`);
   o.push(`<rect width="${G.W}" height="${G.H}" fill="#fff"/>`);
   G.FIDP.forEach(([x,y]) => o.push(`<rect x="${x}" y="${y}" width="${G.FID}" height="${G.FID}" fill="#000"/>`));
@@ -303,7 +302,7 @@ function sheetSVG(sh){
   o.push(txt(13, 7.2, 'NORDIC WALKING STYLE · CIRCUITO 2026', {fs:1.8, fill:'#555', ls:.15}));
   o.push(txt(13, 11.6, sh.title, {fs:3.6, fw:800, fill:'#c0392b'}));
   o.push(txt(13, 15.6, sh.subtitle, {fs:2.2, fw:700}));
-  const meta = sh.meta; let mx = 66;
+  const meta = sh.meta; let mx = 80;   // dopo il titolo più lungo (GIUDICE DI CAMPO · COPPIE)
   meta.forEach(([k, v, w]) => {
     o.push(txt(mx, 7.4, k.toUpperCase(), {fs:1.6, fill:'#666', ls:.1}));
     o.push(txt(mx, 12, v, {fs:2.7, fw:600}));
@@ -314,16 +313,18 @@ function sheetSVG(sh){
   // istruzioni
   o.push(txt(13, 21, sh.ins, {fs:2.6, fill:'#222'}));
   // intestazione pettorali
-  o.push(`<rect x="${G.TX}" y="${G.TY}" width="${G.FIX[0]+G.FIX[1]}" height="${G.RY-G.TY}" fill="#fff" stroke="#777" stroke-width=".2"/>`);
   const ind = sh.type === 'IND';   // individuali: solo il pettorale, la categoria non si stampa
-  o.push(txt(G.TX+8, G.TY+9, 'PETT.', {fs:2.4, fw:700, a:'middle'}));
-  if (!ind) o.push(txt(G.TX+8, G.TY+12, 'Cat.', {fs:1.8, fill:'#555', a:'middle'}));
+  [G.TX, p2x].forEach(px => {
+    o.push(`<rect x="${px}" y="${G.TY}" width="${G.PB}" height="${G.RY-G.TY}" fill="#fff" stroke="#777" stroke-width=".2"/>`);
+    o.push(txt(px+G.PB/2, G.TY+9, 'PETT.', {fs:2.4, fw:700, a:'middle'}));
+    if (!ind) o.push(txt(px+G.PB/2, G.TY+12, 'Cat.', {fs:1.8, fill:'#555', a:'middle'}));
+  });
   const ax = G.TX+G.FIX[0]+G.FIX[1];
   o.push(`<rect x="${ax}" y="${G.TY}" width="${G.FIX[2]}" height="${G.RY-G.TY}" fill="#fff" stroke="#777" stroke-width=".2"/>`);
   o.push(txt(ax+G.FIX[2]/2+.8, G.RY-1.2, 'ASSENTE', {fs:2, fw:800, tr:`rotate(-90 ${ax+G.FIX[2]/2+.8} ${G.RY-1.2})`}));
   // intestazioni giri
   for (let g = 0; g < 2; g++){
-    const x0 = g0x + g*G.GW, U = L.cols[g];
+    const x0 = giroX(g), U = L.cols[g];
     o.push(`<rect x="${x0}" y="${G.TY}" width="${G.GW}" height="${G.H1}" fill="#111"/>`);
     const gt = sh.kind === 'campo' ? `${g+1}° GIRO · POSTAZIONE ${g ? sh.post2 : sh.post1}` : `${g+1}° GIRO`;
     const gs = sh.kind === 'campo' ? ` · Prova: ${g ? sh.prova2 : sh.prova1}` : ' · Gesto tecnico complessivo nella tecnica alternata';
@@ -351,7 +352,7 @@ function sheetSVG(sh){
         o.push(`<rect x="${u.x}" y="${ly}" width="${w5}" height="${G.H3}" fill="#fff" stroke="#777" stroke-width=".2"/>`);
         o.push(txt(u.x+w5/2, ly+5.2, 'Annerisci', {fs:1.9, a:'middle'}));
         o.push(txt(u.x+w5/2, ly+8, 'UN SOLO voto', {fs:2.1, fw:800, a:'middle'}));
-        o.push(txt(u.x+w5/2, ly+10.8, sh.variant === 'B' ? 'da 5 a 1' : 'da 1 a 5', {fs:1.9, a:'middle'}));
+        o.push(txt(u.x+w5/2, ly+10.8, 'da 1 a 5', {fs:1.9, a:'middle'}));
         return;
       }
       if (u.k[0] === 'Z'){
@@ -399,11 +400,14 @@ function sheetSVG(sh){
       o.push(`<rect x="${G.TX}" y="${y}" width="${G.TW}" height="${G.RH}" fill="#ececec"/>`);
       continue;
     }
-    o.push(txt(G.TX + (ind ? (G.FIX[0] + G.FIX[1])/2 : 5), y + 4.4, row.p, {fs:3.7, fw:800, a:'middle'}));
-    if (!ind) o.push(txt(G.TX + G.FIX[0] + G.FIX[1]/2, y + 4, catLabel(row.cat || ''), {fs:1.9, fill:'#444', a:'middle'}));
+    if (r % 2) o.push(`<rect x="${G.TX}" y="${y}" width="${G.TW}" height="${G.RH}" fill="#f1f1f1"/>`);   // righe alterne, per seguire la riga
+    [G.TX, p2x].forEach(px => {
+      o.push(txt(px + (ind ? G.PB/2 : 5), y + 4.4, row.p, {fs:3.7, fw:800, a:'middle'}));
+      if (!ind) o.push(txt(px + G.FIX[0] + G.FIX[1]/2, y + 4, catLabel(row.cat || ''), {fs:1.9, fill:'#444', a:'middle'}));
+    });
   }
   // griglia
-  const vx = new Set([G.TX, ...(ind ? [] : [G.TX+G.FIX[0]]), G.TX+G.FIX[0]+G.FIX[1], g0x, g0x+G.GW, G.TX+G.TW]);
+  const vx = new Set([G.TX, ...(ind ? [] : [G.TX+G.FIX[0], p2x+G.FIX[0]]), G.TX+G.FIX[0]+G.FIX[1], g0x, p2x, p2x+G.PB, G.TX+G.TW]);
   L.cols.forEach(U => U.forEach(u => { if (u.k !== 'D2') vx.add(+u.x.toFixed(3)); }));
   vx.forEach(x => o.push(`<line x1="${x}" y1="${G.RY}" x2="${x}" y2="${tot}" stroke="#777" stroke-width=".2"/>`));
   L.cols.forEach(U => { const d2 = U.find(u => u.k === 'D2'); if (d2) o.push(`<line x1="${d2.x}" y1="${G.RY}" x2="${d2.x}" y2="${tot}" stroke="#bbb" stroke-width=".2"/>`); });
@@ -414,7 +418,8 @@ function sheetSVG(sh){
     o.push(`<line x1="${G.TX}" y1="${y}" x2="${G.TX+G.TW}" y2="${y}" stroke="${th > .3 ? '#111' : '#777'}" stroke-width="${th}"/>`);
   }
   o.push(`<line x1="${g0x}" y1="${G.TY}" x2="${g0x}" y2="${tot}" stroke="#111" stroke-width=".6"/>`);
-  o.push(`<line x1="${g0x+G.GW}" y1="${G.TY}" x2="${g0x+G.GW}" y2="${tot}" stroke="#111" stroke-width=".9"/>`);
+  o.push(`<line x1="${p2x}" y1="${G.TY}" x2="${p2x}" y2="${tot}" stroke="#111" stroke-width=".9"/>`);
+  o.push(`<line x1="${p2x+G.PB}" y1="${G.TY}" x2="${p2x+G.PB}" y2="${tot}" stroke="#111" stroke-width=".6"/>`);
   // cerchi e caselle
   L.bubbles.forEach(b => {
     if (b.sq) o.push(`<rect x="${b.cx-b.r}" y="${b.cy-b.r}" width="${b.r*2}" height="${b.r*2}" rx=".5" fill="none" stroke="#333" stroke-width=".28"/>`);
@@ -441,11 +446,12 @@ function sheetSVG(sh){
 /* ======================= GARA → SCHEDE ======================= */
 function chk(s){ let t = 0; for (const c of s) t = (t*31 + c.charCodeAt(0)) % 1679; return (t % 36).toString(36).toUpperCase(); }
 function makePayload(code, sec, judge, f, p1, p2){
-  const base = `NWS1.${code}.${sec}.${judge}.F${f}.${p1}.${p2}`;
+  const base = `NWS2.${code}.${sec}.${judge}.F${f}.${p1}.${p2}`;
   return base + '.' + chk(base);
 }
 function parsePayload(s){
-  const m = /^NWS1\.([A-Z0-9]+)\.(\d+)(IND|COP|MIX)\.(G\d+B?|C\d+)\.F(\d+)\.(\d+)\.(\d+)\.([0-9A-Z])$/.exec((s||'').trim().toUpperCase());
+  if (/^NWS1\./.test((s||'').trim().toUpperCase())) return {old: true};
+  const m = /^NWS2\.([A-Z0-9]+)\.(\d+)(IND|COP|MIX)\.(G\d+B?|C\d+)\.F(\d+)\.(\d+)\.(\d+)\.([0-9A-Z])$/.exec((s||'').trim().toUpperCase());
   if (!m) return null;
   const base = s.trim().toUpperCase().slice(0, -2);
   return {code:m[1], sec:+m[2], type:m[3], judge:m[4].replace(/B$/, ''), variant: /B$/.test(m[4]) ? 'B' : 'A',
@@ -589,7 +595,7 @@ function buildSheets(gara){
       const p1 = rows[0].p, p2 = rows[rows.length-1].p;
       const gara1 = `${tipoLab} · ${sec.nome}${fogli.length > 1 ? ` · foglio ${fi+1}/${fogli.length}` : ''}`;
       // note sulla scheda: solo l'essenziale, su una riga (il resto si spiega al briefing)
-      const sync = sec.type !== 'IND' ? ' · sincronia: un solo voto' : '', corr = ' · correzione: X e firma in Sigla';
+      const sync = sec.type !== 'IND' ? ' · sincronia: un solo voto' : '', corr = ' · correzione: X sul cerchio sbagliato';
       const vB = gara.varCampo === 'B';
       for (let j = 1; j <= gara.ng; j++){
         const post1 = j, post2 = pairPost(j) <= gara.ng ? pairPost(j) : j;
@@ -597,7 +603,7 @@ function buildSheets(gara){
         sheets.push({kind:'campo', type:sec.type, judge:'G'+j, variant: vB ? 'B' : 'A', sec:sec.idx, foglio:fi+1, rows,
           title: sec.type === 'IND' ? 'GIUDICE DI CAMPO' : 'GIUDICE DI CAMPO · COPPIE', subtitle: `Giudice G${j}` + (vB ? ' · scheda a zone' : ''),
           post1, post2, prova1: gara.prove[post1-1] || `Prova ${post1}`, prova2: gara.prove[post2-1] || `Prova ${post2}`,
-          meta: [['Tappa', gara.tappa, 30], ['Data', gara.data, 24], ['Gara', gara1, 62], ['Nome giudice', '', 40], ['Assenti al briefing', '', 40]],
+          meta: [['Tappa', gara.tappa, 30], ['Data', gara.data, 24], ['Gara', gara1, 62], ['Nome giudice', '', 58]],
           ins: vB ? 'Pennarello nero · un cerchio per zona' + sync + corr :
                'Pennarello nero · un cerchio per elemento corretto · totale a due cifre (08)' + sync + corr,
           payload: makePayload(gara.code, sec2, 'G'+j+(vB ? 'B' : ''), fi+1, p1, p2)});
@@ -605,8 +611,8 @@ function buildSheets(gara){
       for (let c = 1; c <= gara.nc; c++){
         sheets.push({kind:'capo', type:sec.type, judge:'C'+c, sec:sec.idx, foglio:fi+1, rows,
           title: sec.type === 'IND' ? 'GIUDICE CAPO' : 'GIUDICE CAPO · COPPIE', subtitle: gara.nc > 1 ? `Giudice capo ${c}` : 'Giudice capo',
-          meta: [['Tappa', gara.tappa, 30], ['Data', gara.data, 24], ['Gara', gara1, 62], ['Nome giudice capo', '', 40], ['Assenti al briefing', '', 40]],
-          ins: 'Pennarello nero · un solo voto per giro · voto a due cifre (08)' + sync + corr,
+          meta: [['Tappa', gara.tappa, 30], ['Data', gara.data, 24], ['Gara', gara1, 62], ['Nome giudice capo', '', 58]],
+          ins: 'Pennarello nero · un solo voto per giro' + sync + corr,
           payload: makePayload(gara.code, `${sec.idx}${sec.type}`, 'C'+c, fi+1, p1, p2)});
       }
     });
@@ -1013,8 +1019,9 @@ async function readSheet(img, manual){
   let isManual = false;
   if (!qr && manual){ qr = manual.toUpperCase().replace(/\s+/g, ''); isManual = true; }
   const pl = parsePayload(qr);
+  if (pl && pl.old) throw new Error('Scheda stampata con una versione precedente: ristampala.');
   if (!pl){
-    if (isManual) throw new Error(`Codice "${qr}" non valido: copialo per intero, es. NWS1.MES26.1IND.G1.F1.1.25.X`);
+    if (isManual) throw new Error(`Codice "${qr}" non valido: copialo per intero, es. NWS2.MES26.1IND.G1.F1.1.25.X`);
     if (qr) throw new Error(`QR non riconosciuto: ${qr}`);
     const e = new Error('QR non leggibile: scrivi il codice stampato in basso a destra della scheda.'); e.needCode = true; throw e;
   }
@@ -1065,6 +1072,13 @@ async function readSheet(img, manual){
   Object.values(grp).forEach(bs => {
     const s = bs.slice().sort((x, y) => y.fill - x.fill), a = s[0].fill, b2 = s[1] ? s[1].fill : 0;
     if (s[0].state !== 'F' && a >= T_ONE && a >= 4*Math.max(b2, .01) && !bs.some(b => b.state === 'F')) s[0].state = 'F';
+    // rumore (pennarello passato dal foglio sopra, punta appoggiata): accanto a un solo cerchio pieno, i segni deboli non contano
+    const full = bs.filter(b => b.state === 'F');
+    if (full.length === 1) bs.forEach(b => { if (b.state === 'D' && b.fill < full[0].fill / 3) b.state = 'E'; });
+  });
+  // cerchio ASSENTE appena sporco in una riga che ha i suoi voti: rumore
+  L.bubbles.filter(b => b.key === 'ASS' && b.state === 'D' && b.fill < .2).forEach(a => {
+    if (L.bubbles.some(b => b.row === a.row && b.giro >= 0 && b.state === 'F')) a.state = 'E';
   });
   const res = {pl, sh, L, warp, payload: qr, manual: isManual, orient: orient && {r: orient.r, gap: orient.gap}, at: new Date().toISOString()};
   evaluate(res);
@@ -1074,7 +1088,7 @@ async function readSheet(img, manual){
 /* interpreta i cerchi: voti per riga e anomalie */
 function evaluate(res){
   const {sh, L} = res, out = [];
-  const isF = b => (b.ovr || b.state) === 'F', isD = b => !b.ovr && b.state === 'D';
+  const isF = b => !!b && (b.ovr || b.state) === 'F', isD = b => !!b && !b.ovr && b.state === 'D';
   sh.rows.forEach((row, r) => {
     const B = L.bubbles.filter(b => b.row === r), X = L.boxes.filter(b => b.row === r);
     const ass = B.find(b => b.key === 'ASS'), rec = {p: row.p, cat: row.cat, ass: isF(ass), giri: [], flags: []};
@@ -1166,8 +1180,8 @@ $('file').onchange = async e => {
 };
 function renderPending(){
   $('needcode').innerHTML = PENDING.map((p, i) => `<div class="card" style="margin:12px 0 0;padding:12px;border:1px solid var(--warn)">
-    <b>${esc(p.name)}</b>: QR non leggibile.<p class="hint">Scrivi il codice stampato in basso a destra della scheda, dopo «Codice» (es. NWS1.MES26.1IND.G1.F1.1.25.X).</p>
-    <div class="row" style="margin-top:8px;gap:8px"><input data-i="${i}" placeholder="NWS1.…" autocapitalize="characters" autocomplete="off" spellcheck="false" style="flex:1;font-family:ui-monospace,monospace">
+    <b>${esc(p.name)}</b>: QR non leggibile.<p class="hint">Scrivi il codice stampato in basso a destra della scheda, dopo «Codice» (es. NWS2.MES26.1IND.G1.F1.1.25.X).</p>
+    <div class="row" style="margin-top:8px;gap:8px"><input data-i="${i}" placeholder="NWS2.…" autocapitalize="characters" autocomplete="off" spellcheck="false" style="flex:1;font-family:ui-monospace,monospace">
     <button class="btn" data-go="${i}">Leggi</button><button class="btn sec" data-drop="${i}">Scarta</button></div>
     <p class="hint" data-msg="${i}"></p></div>`).join('');
   document.querySelectorAll('#needcode [data-go]').forEach(b => b.onclick = async () => {
