@@ -194,7 +194,7 @@ window.NWS_CIRCUITO = {
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
 <script>
 'use strict';
-const VERSION = '0.5.2';
+const VERSION = '0.5.3';
 document.getElementById('ver').textContent = VERSION;
 const OPENCV_URL = 'https://cdn.jsdelivr.net/npm/@techstark/opencv-js@4.10.0-release.1/dist/opencv.js';
 
@@ -302,7 +302,7 @@ function sheetSVG(sh){
   o.push(`<rect width="${G.W}" height="${G.H}" fill="#fff"/>`);
   G.FIDP.forEach(([x,y]) => o.push(`<rect x="${x}" y="${y}" width="${G.FID}" height="${G.FID}" fill="#000"/>`));
   // testata
-  o.push(txt(13, 7.2, 'NORDIC WALKING STYLE · CIRCUITO 2026', {fs:1.8, fill:'#555', ls:.15}));
+  o.push(txt(13, 7.2, 'NORDIC WALKING STYLE · CIRCUITO 2026 · v' + VERSION, {fs:1.8, fill:'#555', ls:.15}));
   o.push(txt(13, 11.6, sh.title, {fs:3.6, fw:800, fill:'#c0392b'}));
   o.push(txt(13, 15.6, sh.subtitle, {fs:2.2, fw:700}));
   const meta = sh.meta; let mx = 80;   // dopo il titolo più lungo (GIUDICE DI CAMPO · COPPIE)
@@ -441,7 +441,8 @@ function sheetSVG(sh){
   o.push(`<line x1="154" y1="${fy+.6}" x2="178" y2="${fy+.6}" stroke="#111" stroke-width=".25"/>`);
   o.push(`<rect x="183" y="${fy-2.4}" width="3" height="3" fill="none" stroke="#111" stroke-width=".3"/>`);
   o.push(txt(187.5, fy, 'Foto di controllo scattata', {fs:1.9}));
-  o.push(txt(284, fy, 'Codice ' + sh.payload + ' · demo v' + VERSION, {fs:2.0, fill:'#444', a:'end'}));
+  o.push(txt(284, fy - 3.4, 'CODICE SCHEDA', {fs:1.5, fill:'#666', a:'end', ls:.1}));
+  o.push(`<text x="284" y="${fy + .4}" font-size="3.4" font-weight="700" fill="#111" text-anchor="end" font-family="DejaVu Sans Mono, Consolas, monospace">${esc(sh.payload)}</text>`);
   o.push('</svg>');
   return o.join('');
 }
@@ -877,8 +878,8 @@ function polyArea(q){ let s = 0; for (let i = 0; i < 4; i++){ const a = q[i], b 
 function cornersFor(q, rot){ const r = i => q[(i + rot) % 4]; return [r(0), r(1), r(3), r(2)]; } // TL, TR, BL, BR
 
 /* raddrizza solo la zona del QR (veloce), per capire l'orientamento */
-function warpQR(cv, src, pts){
-  const s = 7, x0 = G.QR.x - 3, y0 = G.QR.y - 2.5, w = G.QR.s + 6, h = G.QR.s + 5;
+function warpQR(cv, src, pts, s = 7, boost = false){
+  const x0 = G.QR.x - 3, y0 = G.QR.y - 2.5, w = G.QR.s + 6, h = G.QR.s + 5;
   const dst = new cv.Mat();
   const sp = cv.matFromArray(4, 1, cv.CV_32FC2, pts.flatMap(p => [p.x, p.y]));
   const dp = cv.matFromArray(4, 1, cv.CV_32FC2, G.FC.flatMap(([x, y]) => [(x-x0)*s, (y-y0)*s]));
@@ -887,8 +888,39 @@ function warpQR(cv, src, pts){
   const c = document.createElement('canvas'); c.width = w*s; c.height = h*s; cv.imshow(c, dst);
   [dst, sp, dp, M].forEach(m => m.delete());
   const im = c.getContext('2d').getImageData(0, 0, c.width, c.height);
-  const r = jsQR(im.data, im.width, im.height, {inversionAttempts:'dontInvert'});
+  if (boost) stretchGray(im);
+  const r = jsQR(im.data, im.width, im.height, {inversionAttempts: boost ? 'attemptBoth' : 'dontInvert'});
   return r && r.data ? r.data : null;
+}
+// contrasto rinforzato: grigio stirato tra il 3° e il 97° percentile (riflessi e ombre leggere sul QR)
+function stretchGray(im){
+  const d = im.data, n = d.length / 4, g = new Uint8Array(n), h = new Uint32Array(256);
+  for (let i = 0; i < n; i++){ g[i] = d[i*4]*.299 + d[i*4+1]*.587 + d[i*4+2]*.114; h[g[i]]++; }
+  let lo = 0, hi = 255, c = 0; for (; lo < 255 && (c += h[lo]) < n*.03; lo++); c = 0; for (; hi > 0 && (c += h[hi]) < n*.03; hi--);
+  const k = 255 / Math.max(1, hi - lo);
+  for (let i = 0; i < n; i++){ const v = Math.max(0, Math.min(255, (g[i] - lo) * k)); d[i*4] = d[i*4+1] = d[i*4+2] = v; }
+}
+// prova il QR nelle 4 rotazioni, prima normale poi con ingrandimenti diversi e contrasto rinforzato
+const QR_TRIES = [[7, false], [11, false], [5, false], [7, true], [11, true], [9, true]];
+function findQR(cv, src, qf){
+  for (const [sc, boost] of QR_TRIES) for (let rot = 0; rot < 4; rot++){
+    const c = cornersFor(qf, rot), d = warpQR(cv, src, c, sc, boost);
+    if (d) return {qr: d, pts: c};
+  }
+  return {qr: null, pts: null};
+}
+// codice scritto a mano: spazi tolti; se la lettera di controllo non torna si provano le grafie O/0 e I/1
+function fixManual(m){
+  const c = m.toUpperCase().trim().replace(/[\s·,.]+/g, '.');   // punti, spazi o virgole: tutti separatori
+  const p = parsePayload(c); if (p && (p.ok || p.old)) return c;
+  const parts = c.split('.'), alts = [];
+  const swap = t => [t, t.replace(/O/g, '0').replace(/I/g, '1'), t.replace(/0/g, 'O').replace(/1/g, 'I')];
+  // le parti numeriche vanno in cifre; l'ultima (controllo) e il codice gara possono essere lettere o cifre
+  const fixed = parts.map((t, i) => i === 0 ? t.replace(/O/g, '0') : /^(F|\d)/.test(t) && i > 3 && i < parts.length - 1 ? t.replace(/O/g, '0').replace(/I/g, '1') : t);
+  for (const a of swap(fixed[1] || '')) for (const z of swap(fixed[fixed.length - 1] || '')){
+    const t = fixed.slice(); t[1] = a; t[t.length - 1] = z; alts.push(t.join('.'));
+  }
+  return alts.find(t => { const q = parsePayload(t); return q && q.ok; }) || c;
 }
 function warpSheet(cv, canvas, pts){
   const src = cv.imread(canvas), dst = new cv.Mat();
@@ -1032,12 +1064,12 @@ async function readSheet(img, manual){
   const qf = quad.map(p => ({x: p.x*kk, y: p.y*kk}));
   // orientamento: prova le 4 rotazioni finché il QR si legge nella posizione attesa
   const srcM = cv.imread(full); let qr = null, pts = null;
-  for (let rot = 0; rot < 4 && !qr; rot++){ const c = cornersFor(qf, rot); const d = warpQR(cv, srcM, c); if (d){ qr = d; pts = c; } }
+  ({qr, pts} = findQR(cv, srcM, qf));
   srcM.delete();
   let warp = pts ? warpSheet(cv, full, pts) : null, w0 = null;
   if (!qr){ w0 = warpSheet(cv, full, cornersFor(qf, 0)); qr = decodeQR(w0, det); }
   let isManual = false;
-  if (!qr && manual){ qr = manual.toUpperCase().replace(/\s+/g, ''); isManual = true; }
+  if (!qr && manual){ qr = fixManual(manual); isManual = true; }
   const pl = parsePayload(qr);
   if (pl && pl.old) throw new Error('Scheda stampata con una versione precedente: ristampala.');
   if (!pl){
