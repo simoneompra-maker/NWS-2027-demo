@@ -194,7 +194,7 @@ window.NWS_CIRCUITO = {
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
 <script>
 'use strict';
-const VERSION = '0.5.3';
+const VERSION = '0.5.4';
 document.getElementById('ver').textContent = VERSION;
 const OPENCV_URL = 'https://cdn.jsdelivr.net/npm/@techstark/opencv-js@4.10.0-release.1/dist/opencv.js';
 
@@ -1353,21 +1353,29 @@ function computeClassifica(code){
     const nf = Math.ceil(sec.atl.length / G.NR);
     const judges = [...Array(gara.ng)].map((_, j) => 'G' + (j+1)).concat([...Array(gara.nc)].map((_, c) => 'C' + (c+1)));
     for (let f = 1; f <= nf; f++) judges.forEach(j => { if (!L.some(l => l.sec === sec.idx && l.foglio === f && l.judge === j)) mancanti.push(`${sec.nome}${nf > 1 ? ' f.' + f : ''} ${j}`); });
-    sec.atl.forEach(a => atl[sec.idx + ':' + a.p] = {a, sec, campo: 0, n: 0, ass: false, verif: 0, J: {}});
+    sec.atl.forEach(a => atl[sec.idx + ':' + a.p] = {a, sec, campo: 0, n: 0, ass: false, verif: 0, J: {}, assBy: [], votoBy: []});
   });
   L.forEach(l => l.rows.forEach(r => {
     const x = atl[l.sec + ':' + r.p]; if (!x) return;
-    x.n++; x.ass = x.ass || r.ass; x.verif += r.flags;
+    x.n++; x.verif += r.flags;
+    if (r.ass) x.assBy.push(l.judge); else if (r.giri.some(g => g.score !== null || g.ae)) x.votoBy.push(l.judge);
     const gs = r.giri.map(g => g.score || 0);
     x.J[l.judge] = [(x.J[l.judge] || [0, 0])[0] + gs[0], (x.J[l.judge] || [0, 0])[1] + gs[1]];   // voti di ogni giudice, per giro
     x.campo += gs[0] + gs[1];   // Tot. giudici: tutti i giudici, capo compreso
   }));
+  // un assente deve esserlo per tutti: se i giudici non sono d'accordo decide la maggioranza, ma si segnala
+  const incoerenti = [];
+  Object.values(atl).forEach(x => {
+    x.ass = x.assBy.length > 0 && x.assBy.length >= x.votoBy.length;
+    if (x.assBy.length && x.votoBy.length) incoerenti.push(`Pett. ${x.a.p}: assente per ${x.assBy.join(', ')}, con voti da ${x.votoBy.join(', ')}` + (x.ass ? ' (escluso)' : ' (in classifica)'));
+  });
+  const senza = Object.values(atl).filter(x => !x.n).length;
   const cats = {};
   Object.values(atl).forEach(x => {
     if (x.ass || !x.n) return;
     const cid = circuitCat(x.sec.type, x.a.cat), cop = x.sec.type !== 'IND', nomi = (x.a.nome || '').split(' / ');
     const r = {p: x.a.p, cop, assoc: [...new Set([].concat(x.a.campi || []).map(c => campo({campi: c}, /asd|societ|squadra|club/i)).filter(Boolean))].join(' / '),
-      tot: x.campo, verif: x.verif};
+      tot: x.campo, verif: x.verif + (x.assBy.length ? 1 : 0)};
     // decimali: a coppie di cifre, nell'ordine scelto per la gara (capo per primo)
     r.dec = (gara.decimali || [{j: 'C1', g: 'tot'}]).map(d => { const s = x.J[d.j] || [0, 0]; return Math.min(99, d.g === '1' ? s[0] : d.g === '2' ? s[1] : s[0] + s[1]); });
     r.ptsTxt = r.tot + (r.dec.length ? ',' + r.dec.map(n => String(n).padStart(2, '0')).join('') : '');
@@ -1378,7 +1386,7 @@ function computeClassifica(code){
   // ordine: Tot. giudici, poi i decimali uno dopo l'altro; pari solo se coincidono tutti
   const key = r => [r.tot].concat(r.dec), cmp = (x, y) => { const a = key(x), b = key(y); for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return b[i] - a[i]; return 0; };
   Object.values(cats).forEach(a => { a.sort(cmp); a.forEach((r, i) => r.pos = i && !cmp(r, a[i-1]) ? a[i-1].pos : i + 1); });
-  return {gara, cats, mancanti, letture: L.length, verif: Object.values(atl).reduce((t, x) => t + x.verif, 0)};
+  return {gara, cats, mancanti, incoerenti, senza, assenti: Object.values(atl).filter(x => x.ass).length, letture: L.length, verif: Object.values(atl).reduce((t, x) => t + x.verif, 0)};
 }
 function renderClassifica(){
   const garas = load('gare') || {}, sel = $('cl-gara'), cur = sel.value || v('g-code').toUpperCase();
@@ -1391,7 +1399,10 @@ function renderClassifica(){
   $('cl-formula').innerHTML = '<b>Tot. giudici</b> = somma dei voti di tutti i giudici, capo compreso, nei due giri · i decimali risolvono le parità.';
   const nm = C.mancanti.length;
   $('cl-info').innerHTML = `<p>${C.letture} schede lette · ` + (nm ? `<span class="pill warn">${nm} schede mancanti</span> <small>${esc(C.mancanti.slice(0, 8).join(', '))}${nm > 8 ? '…' : ''}</small>` : '<span class="pill ok">tutte le schede lette</span>') +
-    (C.verif ? ` · <span class="pill warn">${C.verif} righe da verificare</span>` : '') + '</p>' + (nm ? '<p class="hint">Classifica parziale: si completa man mano che arrivano le schede.</p>' : '');
+    (C.verif ? ` · <span class="pill warn">${C.verif} righe da verificare</span>` : '') + ` · ${C.assenti} assenti</p>` +
+    (C.incoerenti.length ? `<p><span class="pill bad">Assenze non coerenti tra i giudici: ${C.incoerenti.length}</span></p><ul class="hint" style="margin:4px 0">${C.incoerenti.map(t => `<li>${esc(t)}</li>`).join('')}</ul>` : '') +
+    (C.senza && !nm ? `<p><span class="pill warn">${C.senza} iscritti senza voti</span></p>` : '') +
+    (nm ? '<p class="hint">Classifica parziale: si completa man mano che arrivano le schede.</p>' : '');
   const order = Object.keys(CAT_NOMI);
   $('cl-tab').innerHTML = Object.keys(C.cats).sort((a, b) => order.indexOf(a) - order.indexOf(b)).map(cid => {
     const rows = C.cats[cid], cop = rows[0].cop;
