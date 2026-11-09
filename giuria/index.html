@@ -121,12 +121,13 @@ window.NWS_CIRCUITO = {
             <option value="nome">nome A→Z</option><option value="-nome">nome Z→A</option><option value="caso">casuale</option></select>
           <label for="g-man" style="margin:0">Atleti per manche</label><input id="g-man" type="number" min="5" max="60" value="25" style="width:70px">
           <label for="g-max" style="margin:0">Massimo per manche</label><input id="g-max" type="number" min="5" max="60" value="30" style="width:70px">
+          <label for="g-ris" style="margin:0">Riserve</label><input id="g-ris" type="number" min="0" max="30" value="5" style="width:60px">
         </div>
         <div class="row" style="margin-top:8px">
           <button class="btn sec" id="b-assign">Assegna pettorali</button>
           <button class="btn sec" id="b-export">Scarica elenco con pettorali</button>
         </div>
-        <p class="hint" id="assign-info">Prima il Gruppo 1, poi gli indifferenti fino a riempire le prime due manche, poi il Gruppo 2 con gli indifferenti rimasti. Le sezioni si scrivono da sole, una per manche.</p></div>
+        <p class="hint" id="assign-info">Prima il Gruppo 1, poi gli indifferenti fino a riempire le prime due manche, poi il Gruppo 2, poi gli indifferenti rimasti. I pettorali già scritti nel file restano; le riserve vanno in coda all'ultima manche. Le sezioni si scrivono da sole, una per manche.</p></div>
     </div>
     <div class="row" style="margin-top:12px">
       <button class="btn" id="b-gen">Genera schede</button>
@@ -194,7 +195,7 @@ window.NWS_CIRCUITO = {
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
 <script>
 'use strict';
-const VERSION = '0.5.4';
+const VERSION = '0.5.5';
 document.getElementById('ver').textContent = VERSION;
 const OPENCV_URL = 'https://cdn.jsdelivr.net/npm/@techstark/opencv-js@4.10.0-release.1/dist/opencv.js';
 
@@ -526,7 +527,8 @@ function parseAtleti(txtv, colP, colC){
 }
 
 /* assegnazione dei pettorali individuali: Gruppo 1, poi indifferenti fino a riempire le prime due manche,
-   poi Gruppo 2 con gli indifferenti rimasti; le coppie tengono il pettorale del file */
+   poi Gruppo 2, poi gli indifferenti rimasti. I pettorali già scritti restano; si assegnano solo quelli vuoti,
+   saltando i numeri già usati. Le riserve vanno in coda all'ultima manche. Le coppie tengono il pettorale del file. */
 function mancheSizes(n, base, max){
   const k = Math.floor(n / base), rem = n - k*base, out = Array(k).fill(base);
   if (rem && k && rem <= max - base) out[k-1] += rem;   // pochi in più: nell'ultima manche
@@ -534,38 +536,60 @@ function mancheSizes(n, base, max){
   return out;
 }
 const ranges = ps => { const out = []; ps.slice().sort((a, b) => a - b).forEach(p => { const r = out[out.length-1]; if (r && p === r[1] + 1) r[1] = p; else out.push([p, p]); }); return out.map(([a, b]) => a === b ? `${a}` : `${a}-${b}`); };
-function assignBibs(){
+const bibOf = (r, ip) => { const t = String(r[ip] || '').trim(); return /^\d+$/.test(t) ? +t : 0; };
+/* confirmed = false: se mancano dati restituisce {ask: [note]} senza toccare nulla */
+function assignBibs(confirmed){
   const T = atlTable(v('g-atl'));
   if (!T || !T.rows.length) throw new Error('carica prima l\'elenco degli atleti');
   const H = T.head, find = re => H.findIndex(h => re.test(h));
   let ip = v('g-colp') !== '' ? +v('g-colp') : find(PETT_RE);
   if (ip < 0){ H.unshift('Pettorale'); T.rows.forEach(r => r.unshift('')); ip = 0; $('g-colp').value = ''; }
   const ig = find(/partenz|gruppo/i), it = find(/^(gara|tipo)/i), ic = find(/^cognome/i), inn = find(/^nome/i);
-  if (ig < 0) throw new Error('manca la colonna della partenza scelta (Gruppo 1, Gruppo 2, Indifferente)');
   const isCop = r => it >= 0 && /copp/i.test(r[it] || '');
   const ind = T.rows.filter(r => !isCop(r)), cop = T.rows.filter(isCop);
+  const bib = r => bibOf(r, ip);
+  // pettorali scritti male o doppi tra gli individuali: ci si ferma
+  const bad = ind.filter(r => String(r[ip] || '').trim() && !bib(r)).map(r => `"${r[ip]}"`);
+  if (bad.length) throw new Error(`pettorali non validi: ${bad.slice(0, 5).join(', ')}. Correggi il file e ricarica`);
+  const seen = new Set(), dup = new Set();
+  ind.forEach(r => { const p = bib(r); if (!p) return; if (seen.has(p)) dup.add(p); seen.add(p); });
+  if (dup.size) throw new Error(`pettorale doppio tra gli individuali: ${[...dup].join(', ')}. Ogni atleta deve avere il suo: correggi il file e ricarica`);
+  const kept = ind.filter(bib), todo = ind.filter(r => !bib(r));
+  const note = [];
+  if (ig < 0 && todo.length) note.push('colonna della partenza (Gruppo 1, Gruppo 2, Indifferente) non trovata: tutti gli atleti saranno trattati come indifferenti');
+  if (kept.length && todo.length) note.push(`${kept.length} pettorali già scritti nel file restano come sono; ne vengono assegnati ${todo.length}, saltando i numeri già usati`);
+  if (note.length && !confirmed) return {ask: note};
   const ord = v('g-ord'), col = ord.replace('-', '') === 'nome' ? inn : ic, dir = ord[0] === '-' ? -1 : 1;
   const sort = a => ord === 'caso' ? a.map(r => [Math.random(), r]).sort((x, y) => x[0] - y[0]).map(x => x[1])
     : a.slice().sort((x, y) => dir * String(x[col] || '').localeCompare(String(y[col] || ''), 'it', {sensitivity:'base'}) || dir * String(x[ic === col ? inn : ic] || '').localeCompare(String(y[ic === col ? inn : ic] || ''), 'it'));
-  const grp = r => /1/.test(r[ig] || '') ? 1 : /2/.test(r[ig] || '') ? 2 : 0;
+  const grp = r => ig < 0 ? 0 : /1/.test(r[ig] || '') ? 1 : /2/.test(r[ig] || '') ? 2 : 0;
   const base = Math.max(5, +v('g-man') || 25), max = Math.max(base, +v('g-max') || base), cap1 = 2*base;
-  const g1 = sort(ind.filter(r => grp(r) === 1)), indiff = sort(ind.filter(r => grp(r) === 0));
-  const fill = indiff.slice(0, Math.max(0, cap1 - g1.length));
-  const g2 = sort(ind.filter(r => grp(r) === 2).concat(indiff.slice(fill.length)));
-  const order = g1.concat(fill, g2), p1 = Math.max(1, +v('g-p1') || 1);
-  order.forEach((r, i) => r[ip] = String(p1 + i));
-  // sezioni: una per manche, più le coppie con i pettorali del file
-  const sizes = mancheSizes(order.length, base, max), sez = []; let a = p1;
-  sizes.forEach((n, i) => { sez.push(`IND | Manche ${i+1} | ${a}-${a + n - 1}`); a += n; });
-  const pc = [...new Set(cop.map(r => parseInt(r[ip], 10)).filter(Boolean))];
+  const g1n = ind.filter(r => grp(r) === 1).length;                 // Gruppo 1, anche con pettorale già scritto
+  const g1 = sort(todo.filter(r => grp(r) === 1)), indiff = sort(todo.filter(r => grp(r) === 0));
+  const fill = indiff.slice(0, Math.max(0, cap1 - g1n));
+  const g2 = sort(todo.filter(r => grp(r) === 2)), rest = indiff.slice(fill.length);
+  const order = g1.concat(fill, g2, rest), p1 = Math.max(1, +v('g-p1') || 1);
+  const used = new Set(kept.map(bib)); let n = p1;
+  order.forEach(r => { while (used.has(n)) n++; r[ip] = String(n); used.add(n); });
+  // manche lungo i pettorali in ordine; riserve in coda all'ultima
+  const all = ind.map(bib).sort((a, b) => a - b), sizes = mancheSizes(all.length, base, max);
+  const nris = Math.max(0, Math.min(30, +v('g-ris') || 0)), last = all.length ? all[all.length-1] : p1 - 1;
+  const ris = [...Array(nris)].map((_, i) => last + 1 + i);
+  const sez = []; let k = 0;
+  sizes.forEach((m, i) => { const ch = all.slice(k, k + m).concat(i === sizes.length - 1 ? ris : []); k += m;
+    sez.push(`IND | Manche ${i+1} | ${ranges(ch).join(', ')}`); });
+  const pc = [...new Set(cop.map(bib).filter(Boolean))];
+  const clash = pc.filter(p => used.has(p) || ris.includes(p));
+  if (clash.length) throw new Error(`i pettorali ${clash.join(', ')} sono sia di un individuale (o riserva) sia di una coppia: cambia il primo pettorale o i numeri delle coppie`);
   if (pc.length) sez.push(`COP | Coppie | ${ranges(pc).join(', ')}`);
   $('g-atl').value = [H].concat(T.rows).map(r => r.join('\t')).join('\n'); $('g-sez').value = sez.join('\n');
   atlPreview();
-  const g2s = g2.length - (indiff.length - fill.length);
-  return `Gruppo 1: ${g1.length} scelti + ${fill.length} indifferenti · Gruppo 2: ${g2s} scelti + ${indiff.length - fill.length} indifferenti · ` +
-    `${sizes.length} manche (${sizes.join(', ')}), pettorali ${p1}–${p1 + order.length - 1}` +
-    (cop.length ? ` · coppie: ${pc.length} pettorali dal file` + (cop.some(r => !parseInt(r[ip], 10)) ? ' ⚠ alcune coppie senza pettorale' : '') : '') +
-    (g1.length > cap1 ? ` · il Gruppo 1 sfora nella 3ª manche` : '') + (sizes.some(n => n > G.NR) ? ` · le manche oltre ${G.NR} atleti si stampano su due fogli` : '');
+  const g2s = g2.length + kept.filter(r => grp(r) === 2).length;
+  return `Gruppo 1: ${g1n} scelti + ${fill.length} indifferenti · Gruppo 2: ${g2s} scelti` + (rest.length ? ` + ${rest.length} indifferenti in coda` : '') +
+    (kept.length ? ` · ${kept.length} pettorali del file mantenuti` : '') +
+    ` · ${sizes.length} manche (${sizes.join(', ')}), pettorali ${all[0]}–${last}` + (ris.length ? ` · riserve ${ris[0]}–${ris[ris.length-1]}` : '') +
+    (cop.length ? ` · coppie: ${pc.length} pettorali dal file` + (cop.some(r => !bib(r)) ? ' ⚠ alcune coppie senza pettorale' : '') : '') +
+    (g1n > cap1 ? ` · il Gruppo 1 sfora nella 3ª manche` : '') + (sizes.some(m => m + (m === sizes[sizes.length-1] ? ris.length : 0) > G.NR) ? ` · le manche oltre ${G.NR} righe si stampano su due fogli` : '');
 }
 /* decimali per le parità: capo sempre primo, poi fino a 4 giudici a scelta (totale, solo 1° o solo 2° giro) */
 const NDEC = 4, DEC_GIRO = [['tot', 'totale'], ['1', 'solo 1° giro'], ['2', 'solo 2° giro']];
@@ -584,8 +608,12 @@ function readDec(){
 function readGara(){
   const sezioni = parseSezioni(v('g-sez')), A = parseAtleti(v('g-atl'), v('g-colp'), v('g-colc'));
   if (A && A.ip < 0) throw new Error('Atleti: scegli quale colonna contiene il pettorale');
+  const inSez = {};
+  sezioni.forEach(sec => sec.atl.forEach(a => { if (inSez[a.p]) throw new Error(`Pettorale ${a.p} presente in due sezioni (${inSez[a.p]} e ${sec.nome})`); inSez[a.p] = sec.nome; }));
   sezioni.forEach(sec => sec.atl.forEach(a => {
     const x = A && A.byP[a.p];
+    if (x && sec.type === 'IND' && x.cats.length > 1) throw new Error(`Pettorale ${a.p} assegnato a ${x.cats.length} atleti (${x.nome}): ogni atleta deve avere il suo`);
+    if (x && sec.type !== 'IND' && x.cats.length > 2) throw new Error(`Pettorale ${a.p}: ${x.cats.length} atleti per una coppia (${x.nome})`);
     if (x){ a.nome = x.nome; a.campi = x.campi; }
     if (sec.type === 'IND'){ if (x && x.cat) a.cat = x.cat; return; }
     // coppia su due righe: la categoria nasce dai due atleti (Camminatore + Istruttrice = C/I)
@@ -645,7 +673,7 @@ const DEF_PROVE = ['1 Parallelo a 3 + 3 monobraccio','P3 sospeso + P2 + alternat
 const DEF_SEZ = 'IND | Gruppo 1 | 1-25\nCOP | Coppie | 151-160 CC, 161-170 CI, 171-176 II';
 function store(k, val){ try { localStorage.setItem('nwsg.'+k, JSON.stringify(val)); } catch(e){} }
 function load(k){ try { return JSON.parse(localStorage.getItem('nwsg.'+k)); } catch(e){ return null; } }
-let SHEETS = [];
+let SHEETS = [], assignAsk = null;   // assignAsk: note in attesa di conferma per "Assegna pettorali"
 // versione collegata alle classifiche di circuito (demo): tappe del circuito e schede di esempio
 if (window.NWS_CIRCUITO){
   $('g-stage-box').hidden = false; $('demo-box').hidden = false;
@@ -662,9 +690,10 @@ if (window.NWS_CIRCUITO){
   atlPreview();   // riempie i menu delle colonne, poi rimette la scelta salvata
   if (s){ $('g-colp').value = s['g-colp'] || ''; $('g-colc').value = s['g-colc'] || ''; atlPreview(); }
 })();
-function saveForm(){ const f = {}; ['g-tappa','g-code','g-data','g-ng','g-nc','g-var','g-prove','g-sez','g-atl','g-colp','g-colc','g-p1','g-ord','g-man','g-max','g-stage', ...[...Array(NDEC)].flatMap((_, i) => ['g-dj' + i, 'g-dg' + i])].forEach(k => f[k] = v(k)); store('form', f); }
+function saveForm(){ const f = {}; ['g-tappa','g-code','g-data','g-ng','g-nc','g-var','g-prove','g-sez','g-atl','g-colp','g-colc','g-p1','g-ord','g-man','g-max','g-ris','g-stage', ...[...Array(NDEC)].flatMap((_, i) => ['g-dj' + i, 'g-dg' + i])].forEach(k => f[k] = v(k)); store('form', f); }
 /* anteprima dell'elenco atleti: colonne riconosciute e menu per sceglierle a mano */
 function atlPreview(){
+  if (assignAsk){ assignAsk = null; $('b-assign').textContent = 'Assegna pettorali'; $('assign-info').textContent = ''; }
   const cp = v('g-colp'), cc = v('g-colc'), A = parseAtleti(v('g-atl'), cp, cc);
   const opts = (sel, cur) => { $(sel).innerHTML = '<option value="">automatica</option>' + (A ? A.head.map((h, i) => `<option value="${i}">${esc(h)}</option>`).join('') : ''); $(sel).value = cur; };
   opts('g-colp', cp); opts('g-colc', cc);
@@ -674,8 +703,15 @@ function atlPreview(){
 }
 $('g-atl').oninput = $('g-colp').onchange = $('g-colc').onchange = atlPreview;
 $('b-assign').onclick = () => {
-  try { $('assign-info').textContent = '✓ ' + assignBibs(); saveForm(); }
-  catch(e){ $('assign-info').textContent = '⚠ ' + e.message; }
+  const reset = () => { assignAsk = null; $('b-assign').textContent = 'Assegna pettorali'; };
+  try {
+    const r = assignBibs(!!assignAsk);
+    if (r && r.ask){   // mancano dati: si mostra la nota e si chiede conferma
+      $('assign-info').innerHTML = r.ask.map(t => '⚠ ' + esc(t)).join('<br>') + '<br><b>Premi "Conferma e assegna" per procedere così, oppure correggi il file e ricaricalo.</b>';
+      $('b-assign').textContent = 'Conferma e assegna'; assignAsk = r.ask; return;
+    }
+    reset(); $('assign-info').textContent = '✓ ' + r; saveForm();
+  } catch(e){ reset(); $('assign-info').textContent = '⚠ ' + e.message; }
 };
 // elenco per la segreteria: tutte le colonne più la manche di ogni pettorale (funziona dal PC)
 $('b-export').onclick = async () => {
@@ -715,9 +751,16 @@ function parseCSV(t){
   rows[rows.length-1].push(f);
   return rows;
 }
-// una riga per atleta, colonne separate da tabulazione (le celle non devono contenerne)
-const rowsToTSV = rows => rows.map(r => r.map(c => String(c ?? '').replace(/[\t\r\n]+/g, ' ').trim()))
-  .filter(r => r.some(Boolean)).map(r => r.join('\t')).join('\n');
+// una riga per atleta, colonne separate da tabulazione (le celle non devono contenerne).
+// Le colonne di contatto (telefono, email) si scartano subito: alla gara non servono e restano fuori dall'app.
+const PRIV_RE = /telefon|cellular|e-?mail|^mail/i;
+let privTolte = 0;
+const rowsToTSV = rows => {
+  rows = rows.map(r => r.map(c => String(c ?? '').replace(/[\t\r\n]+/g, ' ').trim())).filter(r => r.some(Boolean));
+  const h = rows[0] || [], keep = h.map((_, i) => i).filter(i => !PRIV_RE.test(h[i]));
+  privTolte = h.length - keep.length;
+  return rows.map(r => keep.map(i => r[i] ?? '').join('\t')).join('\n');
+};
 function showSheet(name){
   const rows = XLSX.utils.sheet_to_json(ATL_BOOK.Sheets[name], {header:1, raw:false, defval:''});
   $('g-atl').value = rowsToTSV(rows); $('g-colp').value = $('g-colc').value = ''; atlPreview();
@@ -736,7 +779,7 @@ $('atl-file').onchange = async e => {
       sel.innerHTML = names.map(n => `<option>${esc(n)}</option>`).join(''); sel.hidden = names.length < 2;
       showSheet(names[0]);
     }
-    $('atl-load').textContent = `✓ ${f.name}` + ($('atl-sheet').hidden ? '' : ' · scegli il foglio:');
+    $('atl-load').textContent = `✓ ${f.name}` + (privTolte ? ` · ${privTolte} colonne di contatti (telefono, email) scartate` : '') + ($('atl-sheet').hidden ? '' : ' · scegli il foglio:');
   } catch(err){ $('atl-load').textContent = `⚠ ${f.name}: ${err.message}`; }
 };
 $('atl-sheet').onchange = () => showSheet(v('atl-sheet'));
