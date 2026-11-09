@@ -103,7 +103,7 @@ window.NWS_CIRCUITO = {
         <div class="row" id="g-dec"><span class="pill">1° Giudice capo · totale</span></div>
         <p class="hint">Punti = somma di tutti i giudici, poi a coppie di cifre il capo e i giudici scelti: es. 87,351412. Il criterio non compare in classifica.</p></div>
       <div id="g-stage-box" hidden><label for="g-stage">Tappa del circuito</label><select id="g-stage"></select></div>
-      <div><label>Scheda giudici di campo</label><select id="g-var"><option value="A">A · elementi (1 punto ciascuno)</option><option value="B">B · zone (un cerchio per zona)</option></select></div>
+      <div><label>Scheda giudici di campo</label><select id="g-var"><option value="B">B · zone (un cerchio per zona)</option><option value="A">A · elementi (1 punto ciascuno, con totale scritto)</option></select></div>
     </div>
     <div class="grid" style="margin-top:12px">
       <div style="grid-column:1/-1"><label>Prove (una per riga, nell'ordine delle postazioni 1, 2, 3…)</label>
@@ -176,7 +176,7 @@ window.NWS_CIRCUITO = {
   <div class="scan" id="scan" hidden>
     <div class="card"><h2 id="sc-title">Scheda</h2>
       <div class="cv-wrap"><canvas id="cv"></canvas></div>
-      <p class="hint">Verde = pieno · arancio = dubbio · blu = segnato a mano · grigio barrato = tolto a mano. Tocca un cerchio per correggerlo, toccalo di nuovo per annullare.</p></div>
+      <p class="hint">Verde = pieno · arancio = dubbio · rosso con la X = barrato dal giudice (non conta) · blu = segnato a mano · grigio barrato = tolto a mano. Tocca un cerchio per correggerlo, toccalo di nuovo per annullare.</p></div>
     <div class="card"><h2>Voti letti</h2><div id="sc-sum"></div><div id="sc-table"></div>
       <button class="btn sec" id="b-del" style="margin-top:12px">Elimina questa lettura</button></div>
   </div>
@@ -210,7 +210,7 @@ window.NWS_CIRCUITO = {
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
 <script>
 'use strict';
-const VERSION = '0.5.7';
+const VERSION = '0.5.8';
 document.getElementById('ver').textContent = VERSION;
 const OPENCV_URL = 'https://cdn.jsdelivr.net/npm/@techstark/opencv-js@4.10.0-release.1/dist/opencv.js';
 
@@ -1115,7 +1115,7 @@ $('b-print').onclick = () => {
 /* ======================= LETTURA OTTICA ======================= */
 const S = 8;                    // pixel per mm dell'immagine raddrizzata
 const DARK = 0.55;              // soglia "inchiostro" rispetto al bianco carta locale
-const T_FULL = 0.42, T_DUB = 0.09, T_ONE = 0.08;   // T_ONE: segno unico in un gruppo a scelta singola
+const T_FULL = 0.42, T_DUB = 0.09, T_ONE = 0.08, T_VISIBILE = 0.12;   // T_VISIBILE: segno ben visibile, mai scartato in silenzio   // T_ONE: segno unico in un gruppo a scelta singola
 let cvReady = null;
 function loadOpenCV(){
   if (cvReady) return cvReady;
@@ -1350,6 +1350,25 @@ function inkInDisk(warp, cx, cy, rr){
   }
   return n ? k/n : 0;
 }
+/* correzione con la X: i tratti escono dal cerchio sulle diagonali, mentre un cerchio annerito (anche debordante)
+   o un alone sporcano l'anello attorno in modo uniforme. Si misura l'inchiostro, tolto quello stampato nel modulo,
+   in un anello appena fuori dal cerchio (1,25–1,6 r), in 8 spicchi da 30°: X = tutte e 4 le punte (diagonali) sporche e la punta più debole più sporca
+   del lato più sporco (su, giù, destra, sinistra). Un cerchio ovale o debordante sporca 2–3 diagonali, o i lati
+   quanto le diagonali: non basta */
+const X_PUNTA = .12, X_MARGINE = .03;
+function crossAt(warp, tpl, b, dx, dy){
+  const cx = (b.cx + dx)*S, cy = (b.cy + dy)*S, R0 = 1.25*b.r*S, R1 = 1.6*b.r*S, k = [0,0,0,0,0,0,0,0], n = [0,0,0,0,0,0,0,0];
+  for (let y = Math.max(0, Math.floor(cy - R1)); y <= Math.min(warp.h-1, Math.ceil(cy + R1)); y++)
+    for (let x = Math.max(0, Math.floor(cx - R1)); x <= Math.min(warp.w-1, Math.ceil(cx + R1)); x++){
+      const ex = x - cx, ey = y - cy, d = Math.hypot(ex, ey); if (d < R0 || d > R1) continue;
+      const a = Math.atan2(ey, ex), i = ((Math.round(a / (Math.PI/4)) % 8) + 8) % 8;
+      if (Math.abs(a - Math.round(a / (Math.PI/4)) * Math.PI/4) > Math.PI/12) continue;   // solo il centro dello spicchio
+      const tx = Math.round(x - dx*S), ty = Math.round(y - dy*S), t = tx >= 0 && ty >= 0 && tx < tpl.w && ty < tpl.h ? tpl.ink[ty*tpl.w + tx] : 0;
+      n[i]++; k[i] += Math.max(0, warp.ink[y*warp.w + x] - t);
+    }
+  const m = k.map((v, i) => n[i] ? v / n[i] : 0), punta = Math.min(m[1], m[3], m[5], m[7]), lato = Math.max(m[0], m[2], m[4], m[6]);
+  return punta > X_PUNTA && punta > lato + X_MARGINE;
+}
 function inkInBox(warp, b, inset){
   let n = 0, k = 0;
   for (let y = Math.round((b.y+inset)*S); y < (b.y+b.h-inset)*S; y++) for (let x = Math.round((b.x+inset)*S); x < (b.x+b.w-inset)*S; x++){ n++; k += warp.ink[y*warp.w + x]; }
@@ -1463,17 +1482,22 @@ async function readSheet(img, manual){
     });
   }
   L.bubbles.forEach(b => b.state = b.fill >= T_FULL ? 'F' : b.fill >= T_DUB ? 'D' : 'E');
+  // cerchi barrati con la X: non contano mai come voto (e non coprono il segno giusto, anche se debole)
+  L.bubbles.forEach(b => { if (b.state !== 'E' && !b.sq && b.key !== 'ASS' && crossAt(warp, tpl, b, b.ox || 0, b.oy || 0)) b.state = 'X'; });
   // gruppi in cui si sceglie UN SOLO cerchio (zone della scheda B, voto del capo, sincronia): un segno a biro
   // riempie il cerchio solo in parte, ma se è l'unico netto del gruppo e gli altri sono puliti, è quello il voto
   const grp = {};
   L.bubbles.forEach(b => { const g = /^Z[SCI]/.test(b.key) ? b.key.slice(0, 2) : /^[VY]\d/.test(b.key) ? b.key[0] : null;
     if (g) (grp[b.row + '|' + b.giro + '|' + g] = grp[b.row + '|' + b.giro + '|' + g] || []).push(b); });
-  Object.values(grp).forEach(bs => {
+  Object.values(grp).forEach(bs0 => {
+    const bs = bs0.filter(b => b.state !== 'X');   // i cerchi barrati restano fuori dal confronto
+    if (!bs.length) return;
     const s = bs.slice().sort((x, y) => y.fill - x.fill), a = s[0].fill, b2 = s[1] ? s[1].fill : 0;
     if (s[0].state !== 'F' && a >= T_ONE && a >= 4*Math.max(b2, .01) && !bs.some(b => b.state === 'F')) s[0].state = 'F';
-    // rumore (pennarello passato dal foglio sopra, punta appoggiata): accanto a un solo cerchio pieno, i segni deboli non contano
+    // rumore (pennarello passato dal foglio sopra, punta appoggiata): accanto a un solo cerchio pieno, i segni deboli non contano;
+    // un segno ben visibile (>= T_VISIBILE) resta dubbio: può essere il voto giusto accanto a una correzione non riconosciuta
     const full = bs.filter(b => b.state === 'F');
-    if (full.length === 1) bs.forEach(b => { if (b.state === 'D' && b.fill < full[0].fill / 3) b.state = 'E'; });
+    if (full.length === 1) bs.forEach(b => { if (b.state === 'D' && b.fill < full[0].fill / 3 && b.fill < T_VISIBILE) b.state = 'E'; });
   });
   // cerchio ASSENTE appena sporco in una riga che ha i suoi voti: rumore
   L.bubbles.filter(b => b.key === 'ASS' && b.state === 'D' && b.fill < .2).forEach(a => {
@@ -1504,6 +1528,7 @@ function evaluate(res){
       }
       if (sigla && sigla.fill > .06) gi.flags.push('Correzione siglata: verificare');
       const dub = bg.filter(isD); if (dub.length) gi.flags.push(`${dub.length} cerchi dubbi`);
+      const xs = bg.filter(b => !b.ovr && b.state === 'X'); if (xs.length) gi.flags.push(xs.length === 1 ? 'Correzione con la X: verificare' : `${xs.length} correzioni con la X: verificare`);
       if (sh.kind === 'campo' && sh.variant === 'B'){
         const ae = isF(bg.find(b => b.key === 'AE')), np = isF(bg.find(b => b.key === 'NP'));
         const zs = bg.filter(b => b.key[0] === 'Z' && isF(b));
@@ -1614,6 +1639,12 @@ function drawOverlay(res){
       ctx.setLineDash([]); ctx.beginPath(); ctx.moveTo(x - R*.7, y + R*.7); ctx.lineTo(x + R*.7, y - R*.7); ctx.stroke();
       return;
     }
+    if (st === 'X'){   // barrato con la X dal giudice: non conta
+      ctx.strokeStyle = '#c0392b'; ctx.fillStyle = 'rgba(192,57,43,.15)';
+      ctx.beginPath(); ctx.arc(x, y, R, 0, Math.PI*2); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(x - R*.7, y - R*.7); ctx.lineTo(x + R*.7, y + R*.7); ctx.moveTo(x + R*.7, y - R*.7); ctx.lineTo(x - R*.7, y + R*.7); ctx.stroke();
+      return;
+    }
     ctx.strokeStyle = b.ovr ? '#0a84ff' : st === 'F' ? '#1e8a4c' : '#f39c12';
     ctx.fillStyle = b.ovr ? 'rgba(10,132,255,.3)' : st === 'F' ? 'rgba(30,138,76,.25)' : 'rgba(243,156,18,.25)';
     ctx.beginPath(); ctx.arc(x, y, R, 0, Math.PI*2); ctx.fill(); ctx.stroke();
@@ -1625,7 +1656,7 @@ $('cv').addEventListener('click', e => {
   const b = CUR.L.bubbles.find(b => Math.hypot(b.cx + (b.ox||0) - x, b.cy + (b.oy||0) - y) <= b.r + .4);
   if (!b) return;
   // ogni tocco fa un passo e poi torna alla lettura automatica: vuoto → segnato → auto; pieno → tolto → auto; dubbio → pieno → vuoto → auto
-  const next = {E: ['F'], F: ['E'], D: ['F', 'E']}[b.state], i = b.ovr ? next.indexOf(b.ovr) + 1 : 0;
+  const next = {E: ['F'], F: ['E'], D: ['F', 'E'], X: ['F', 'E']}[b.state], i = b.ovr ? next.indexOf(b.ovr) + 1 : 0;
   if (i < next.length) b.ovr = next[i]; else delete b.ovr;
   evaluate(CUR); saveReading(CUR); showRead(CUR); renderReadList();
 });
