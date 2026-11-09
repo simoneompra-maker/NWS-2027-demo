@@ -30,6 +30,10 @@ textarea{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;min-he
 .pages .sheet{background:#fff;border:1px solid var(--line);border-radius:6px;overflow:hidden}
 .pages .sheet svg{width:100%;height:auto;display:block}
 .pill{display:inline-block;padding:2px 8px;border-radius:99px;font-size:12px;background:#eee}
+.chk{border:1px solid #e3d9b8;background:#fffbea;border-radius:10px;padding:10px 12px;margin-top:8px;font-size:13px}
+.chk h4{margin:0 0 6px;font-size:14px}.chk .it{border-top:1px solid #eee3c0;padding:7px 0}.chk .it:first-of-type{border-top:0}
+.chk label.o{display:inline-flex;gap:4px;align-items:center;margin:4px 12px 0 0;font-weight:400;cursor:pointer}
+.chk ul{margin:4px 0 0 18px;padding:0}.chk details{margin:4px 0}
 .pill.ok{background:#dff3e7;color:var(--ok)}.pill.warn{background:#fff1d6;color:#8a5a00}.pill.bad{background:#fbe1de;color:var(--bad)}
 table.res{border-collapse:collapse;width:100%;font-size:13px}
 table.res th,table.res td{border-bottom:1px solid var(--line);padding:5px 6px;text-align:left;vertical-align:top}
@@ -58,6 +62,13 @@ table.res td.n{font-weight:700}
 window.NWS_CIRCUITO = {
   stages: [{"id": "demo-mestre", "name": "Mestre (demo)", "code": "MES27", "data": "12/09/2027"}, {"id": "demo-padova", "name": "Padova (demo)", "code": "PAD27", "data": "16/05/2027"}],
   link: '../classifiche/',
+  /* archivio di confronto per il controllo nomi e ASD: atleti e ASD già nelle classifiche demo */
+  riferimenti: function(){
+    var d = NWSDemoDB.get(), atl = [], asd = {};
+    Object.keys(d.risultati || {}).forEach(function(k){ (d.risultati[k].rows || []).forEach(function(x){ if (x.cognome) atl.push({cognome: x.cognome, nome: x.nome || ''}); if (x.assoc) asd[x.assoc] = 1; }); });
+    Object.keys(d.asd_circuiti || {}).forEach(function(k){ var a = d.asd_circuiti[k]; asd[a.nome_canonico || a.asd_name] = 1; });
+    return {atleti: atl, asd: Object.keys(asd)};
+  },
   publish: function(stage, cats){
     var d = NWSDemoDB.get();
     cats.forEach(function(c){
@@ -113,7 +124,9 @@ window.NWS_CIRCUITO = {
           <label for="g-colp" style="margin:0">Colonna pettorale</label><select id="g-colp" style="width:auto"></select>
           <label for="g-colc" style="margin:0">Colonna categoria</label><select id="g-colc" style="width:auto"></select>
         </div>
-        <p class="hint" id="atl-info"></p></div>
+        <p class="hint" id="atl-info"></p>
+        <div class="row" style="margin-top:6px"><button class="btn sec" id="b-chk">Controlla nomi e ASD</button><span class="hint" style="margin:0">si avvia da solo dopo ogni caricamento</span></div>
+        <div id="chk-box"></div></div>
       <div style="grid-column:1/-1"><label>Pettorali e manche</label>
         <div class="row">
           <label for="g-p1" style="margin:0">Primo pettorale</label><input id="g-p1" type="number" min="1" value="1" style="width:80px">
@@ -197,7 +210,7 @@ window.NWS_CIRCUITO = {
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
 <script>
 'use strict';
-const VERSION = '0.5.6';
+const VERSION = '0.5.7';
 document.getElementById('ver').textContent = VERSION;
 const OPENCV_URL = 'https://cdn.jsdelivr.net/npm/@techstark/opencv-js@4.10.0-release.1/dist/opencv.js';
 
@@ -769,6 +782,192 @@ $('b-export').onclick = async () => {
   } catch(e){ $('assign-info').textContent = '⚠ ' + e.message; }
 };
 
+/* ======================= CONTROLLO NOMI E ASD =======================
+   Stesse regole dell'app delle classifiche NWS 2026:
+   - nome come insieme di parole ordinate: "Rossi Mario" e "Mario Rossi" sono la stessa chiave;
+   - somiglianza dall'85% in su: solo segnalata, mai unita da sola ("Bernardi Paolo" e "Bernardi Paul" possono essere due persone);
+   - ASD: somiglianza letterale dal 70%, altrimenti servono almeno 2 parole distintive in comune (evita "Atletica Gorizia" = "Atletica Cibeno");
+   - "Indipendente", "Nessuna ASD"… = senza ASD.
+   Sistemazioni automatiche: spazi, maiuscole (solo se il nome è tutto maiuscolo o tutto minuscolo), cifre nei nomi, scelte già confermate.
+   Niente cambia nell'elenco finché non si preme "Applica". */
+const fold = s => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+const personKey = s => fold(s).replace(/[^a-z0-9]+/g, ' ').trim().split(/\s+/).filter(Boolean).sort().join(' ');
+function levenshtein(a, b){
+  if (a === b) return 0; if (!a.length) return b.length; if (!b.length) return a.length;
+  let prev = [...Array(b.length + 1).keys()];
+  for (let i = 1; i <= a.length; i++){ const cur = [i];
+    for (let j = 1; j <= b.length; j++) cur[j] = a[i-1] === b[j-1] ? prev[j-1] : 1 + Math.min(prev[j-1], prev[j], cur[j-1]);
+    prev = cur; }
+  return prev[b.length];
+}
+const similarity = (a, b) => !a || !b ? 0 : 1 - levenshtein(a, b) / Math.max(a.length, b.length);
+const nameTokens = s => fold(s).replace(/[^a-z0-9]+/g, ' ').trim().split(/\s+/).filter(w => w.length > 1);
+function personSim(a, b){
+  const A = nameTokens(a), B = nameTokens(b);
+  if (!A.length || !B.length) return 0;
+  if (A.slice().sort().join(' ') === B.slice().sort().join(' ')) return 1;
+  const conta = {}; let comuni = 0;
+  A.forEach(w => conta[w] = (conta[w] || 0) + 1); B.forEach(w => { if (conta[w] > 0){ conta[w]--; comuni++; } });
+  if (comuni >= 2 && (comuni === A.length || comuni === B.length)) return 0.9;   // secondo nome presente in uno solo
+  return Math.max(comuni / (A.length + B.length - comuni), similarity(A.slice().sort().join(' '), B.slice().sort().join(' ')));
+}
+const NO_ASD_RX = /^(indipendent[ei]|individuale|nessuna\s*asd.*|libero\s*professionista|senza\s*asd.*|-+|\/)$/i;
+const normASD = s => fold(s).replace(/['’`]/g, '').replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
+const ASD_STOP = ['asd','aps','ssd','nw','nordic','walking','sport','club','team','del','di','da','le','la'];
+const asdCore = s => (' ' + normASD(s) + ' ').replace(/ (a s d|a p s|s s d|asd|aps|ssd) /g, ' ').trim();
+function asdSim(a, b){
+  const na = asdCore(a), nb = asdCore(b);
+  if (!na || !nb) return 0; if (na === nb) return 1;
+  const lev = similarity(na, nb); if (lev >= 0.70) return lev;
+  const wa = na.split(' ').filter(w => w.length >= 3 && !ASD_STOP.includes(w)), wb = new Set(nb.split(' ').filter(w => w.length >= 3 && !ASD_STOP.includes(w)));
+  if (!wa.length || !wb.size) return 0;
+  const common = wa.filter(w => wb.has(w)).length;
+  if (common < 2) return 0;
+  const jac = common / (wa.length + wb.size - common); return jac >= 0.5 ? jac : 0;
+}
+/* maiuscole: solo se il nome è scritto tutto maiuscolo o tutto minuscolo ("ROSSI" → "Rossi", "d'amico" → "D'Amico");
+   via le cifre attaccate ai nomi ("Paul75" → "Paul") e gli spazi doppi */
+function prettyName(s){
+  let t = String(s || '').replace(/\d+/g, ' ').replace(/\s+/g, ' ').trim();
+  const L = t.replace(/[^A-Za-zÀ-ÿ]/g, '');
+  if (L && (L === L.toUpperCase() || L === L.toLowerCase())) t = t.toLowerCase().replace(/(^|[\s'’\-(])([a-zà-ÿ])/g, (m, p, c) => p + c.toUpperCase());
+  return t;
+}
+/* scelte già confermate (nella demo restano nel browser) */
+const memo = () => Object.assign({nomi: {}, asd: {}, diversi: [], ignora: []}, load('alias') || {});
+/* archivio di confronto: atleti e ASD delle tappe precedenti (nella demo: le classifiche demo) */
+function riferimenti(){
+  try { if (window.NWS_CIRCUITO && NWS_CIRCUITO.riferimenti) return NWS_CIRCUITO.riferimenti(); } catch(e){}
+  return {atleti: [], asd: []};
+}
+let CHK = null;   // ultimo controllo: elenco su cui è stato fatto, sistemazioni automatiche e voci da confermare
+function analizza(){
+  const txt = v('g-atl'), T = atlTable(txt);
+  if (!T || !T.rows.length) return null;
+  const H = T.head, find = re => H.findIndex(h => re.test(h));
+  const ic = find(/^cognome/i), inn = find(/^nome/i), ia = find(/asd|societ|squadra|club/i), icat = find(/^cat/i), it = find(/^(gara|tipo)/i);
+  const ip = v('g-colp') !== '' ? +v('g-colp') : find(PETT_RE);
+  const isCop = r => it >= 0 && /copp/i.test(r[it] || '');
+  const W = T.rows.map(r => r.slice()), M = memo(), RF = riferimenti(), auto = [], items = [];
+  const full = r => `${r[ic] || ''} ${r[inn] || ''}`.trim();
+  const sesso = r => { const c = fold(icat >= 0 ? r[icat] : ''); return /^(istruttric|camminatric)/.test(c) ? 'F' : /^(istrutt|cammin)/.test(c) ? 'M' : ''; };
+  const tag = i => { const r = W[i]; return `${full(r) || '—'}${icat >= 0 && r[icat] ? ' · ' + r[icat] : ''}${ia >= 0 && r[ia] ? ' · ' + r[ia] : ''}${ip >= 0 && r[ip] ? ' · pett. ' + r[ip] : ''}${isCop(r) ? ' · coppia' : ''}`; };
+  // 1. sistemazioni automatiche
+  W.forEach((r, i) => {
+    if (ic >= 0 && inn >= 0){
+      const prima = full(r);
+      [ic, inn].forEach(c => { r[c] = prettyName(r[c]); });
+      const al = M.nomi[personKey(prima)] || M.nomi[personKey(full(r))];
+      if (al && (al[0] !== r[ic] || al[1] !== r[inn])){ r[ic] = al[0]; r[inn] = al[1]; }
+      if (full(r) !== prima) auto.push(`${prima} → ${full(r)}` + (al ? ' (già confermato)' : ''));
+    }
+    if (ia >= 0){
+      const prima = r[ia] || '', t = prima.replace(/\s+/g, ' ').trim(), al = M.asd[normASD(t)];
+      const esatta = !al && RF.asd.find(x => normASD(x) === normASD(t));
+      r[ia] = al || esatta || t;
+      if (r[ia] !== prima) auto.push(`ASD «${prima}» → «${r[ia]}»` + (al ? ' (già confermato)' : ''));
+    }
+  });
+  if (ic >= 0 && inn >= 0){
+    // 2. confronto con l'archivio: nome e cognome invertiti, grafia diversa
+    const arch = new Map(), ord = new Set();
+    RF.atleti.forEach(a => { const c = (a.cognome || '').trim(), n = (a.nome || '').trim(); if (!c) return;
+      ord.add(fold(c) + '|' + fold(n)); arch.set(personKey(c + ' ' + n), [c, n]); });
+    const visti = new Set();
+    W.forEach((r, i) => {
+      const k = personKey(full(r)); if (!k || visti.has(k + '|' + fold(r[ic]))) return; visti.add(k + '|' + fold(r[ic]));
+      if (ord.has(fold(r[ic]) + '|' + fold(r[inn]))) return;
+      if (ord.has(fold(r[inn]) + '|' + fold(r[ic]))){
+        const key = 'inv|' + fold(r[ic]) + '|' + fold(r[inn]); if (M.ignora.includes(key)) return;
+        items.push({tipo: 'inv', key, i, testo: `<b>${esc(tag(i))}</b>: nelle tappe precedenti è <b>${esc(r[inn] + ' ' + r[ic])}</b> (cognome e nome invertiti)`,
+          scelte: [['si', 'Inverti'], ['no', 'Lascia così']], to: [r[inn], r[ic]]});
+        return;
+      }
+      if (arch.has(k)) return;
+      let best = null, bs = 0;
+      arch.forEach(v2 => { const sc = personSim(full(r), v2.join(' ')); if (sc > bs){ bs = sc; best = v2; } });
+      if (best && bs >= 0.85){
+        const key = 'gr|' + k + '|' + personKey(best.join(' ')); if (M.ignora.includes(key)) return;
+        items.push({tipo: 'gr', key, i, testo: `<b>${esc(tag(i))}</b>: nelle tappe precedenti c'è <b>${esc(best.join(' '))}</b> (simile al ${Math.round(bs*100)}%: può essere la stessa persona o un'altra)`,
+          scelte: [['si', 'Usa ' + best.join(' ')], ['no', 'È un\'altra persona / lascia così']], to: best});
+      }
+    });
+    // 3. possibili doppioni tra gli individuali (la stessa persona anche in una coppia è normale)
+    const ind = W.map((r, i) => i).filter(i => !isCop(W[i]) && full(W[i]));
+    for (let x = 0; x < ind.length; x++) for (let y = x + 1; y < ind.length; y++){
+      const a = ind[x], b = ind[y], sc = personSim(full(W[a]), full(W[b]));
+      if (sc < 0.85) continue;
+      const ga = sesso(W[a]), gb = sesso(W[b]); if (ga && gb && ga !== gb) continue;   // genere diverso: persone diverse ("Roberto" e "Roberta")
+      const key = [personKey(full(W[a])), personKey(full(W[b]))].sort().join('/');
+      if (M.diversi.includes(key)) continue;
+      items.push({tipo: 'dup', key, a, b, testo: `Possibile doppione (${Math.round(sc*100)}%):<br>A) ${esc(tag(a))}<br>B) ${esc(tag(b))}`,
+        scelte: [['a', 'Stessa persona: tieni A'], ['b', 'Stessa persona: tieni B'], ['no', 'Persone diverse']]});
+    }
+  }
+  const senzaAsd = [];
+  if (ia >= 0){
+    // 4. ASD scritte in modo diverso dall'elenco delle ASD, oppure in più modi nello stesso file
+    const vals = [...new Set(W.map(r => r[ia]).filter(t => t && !NO_ASD_RX.test(t.trim())))];
+    const noRif = [];
+    vals.forEach(t => {
+      if (RF.asd.includes(t)) return;
+      let best = null, bs = 0; RF.asd.forEach(x => { const sc = asdSim(t, x); if (sc > bs){ bs = sc; best = x; } });
+      const key = 'asd|' + normASD(t);
+      if (best && bs >= 0.5){ if (!M.ignora.includes(key)) items.push({tipo: 'asd', key, val: t, to: best,
+        testo: `ASD <b>«${esc(t)}»</b> (${W.filter(r => r[ia] === t).length} atleti): nell'elenco delle ASD c'è <b>«${esc(best)}»</b>`,
+        scelte: [['si', 'Usa «' + best + '»'], ['no', 'Lascia com\'è']]}); }
+      else noRif.push(t);
+    });
+    // varianti nello stesso file senza riferimento: si raggruppano e si sceglie la grafia
+    const gr = []; noRif.forEach(t => { const g = gr.find(g => g.some(x => asdSim(t, x) >= 0.5)); g ? g.push(t) : gr.push([t]); });
+    gr.filter(g => g.length > 1).forEach(g => { const key = 'asdg|' + g.map(normASD).sort().join('/'); if (M.ignora.includes(key)) return;
+      items.push({tipo: 'asdg', key, vals: g, testo: `La stessa ASD sembra scritta in ${g.length} modi: ${g.map(t => `<b>«${esc(t)}»</b>`).join(', ')}`,
+        scelte: g.map((t, j) => ['v' + j, 'Usa «' + t + '» per tutti']).concat([['no', 'Sono ASD diverse']])}); });
+    W.forEach((r, i) => { if (!r[ia] || NO_ASD_RX.test(r[ia].trim())) senzaAsd.push(i); });
+  }
+  return {txt, T, W, ic, inn, ia, auto, items, senzaAsd, tag};
+}
+function renderCheck(msg){
+  const C = CHK, box = $('chk-box');
+  if (!C){ box.innerHTML = ''; return; }
+  const nI = C.items.length;
+  box.innerHTML = `<div class="chk"><h4>Controllo nomi e ASD</h4>` + (msg ? `<p style="margin:0 0 6px">${msg}</p>` : '') +
+    (C.auto.length ? `<details><summary>✓ ${C.auto.length} sistemazioni automatiche (spazi, maiuscole, cifre nei nomi, scelte già confermate)</summary><ul>${C.auto.map(t => `<li>${esc(t)}</li>`).join('')}</ul></details>` : '<p style="margin:0">✓ Nessuna sistemazione automatica necessaria</p>') +
+    (nI ? `<p style="margin:8px 0 2px"><b>Da confermare (${nI})</b>: scegli e premi Applica; le voci senza scelta restano in sospeso.</p>` +
+      C.items.map((it, k) => `<div class="it">${it.testo}<br>${it.scelte.map(([val, t]) => `<label class="o"><input type="radio" name="chk${k}" value="${val}">${esc(t)}</label>`).join('')}</div>`).join('')
+      : '<p style="margin:6px 0 0">✓ Niente da confermare</p>') +
+    (C.senzaAsd.length ? `<details><summary>⚠ ${C.senzaAsd.length} atleti senza ASD (non contano nelle classifiche ASD)</summary><ul>${C.senzaAsd.map(i => `<li>${esc(C.tag(i))}</li>`).join('')}</ul></details>` : '') +
+    ((C.auto.length || nI) ? `<div class="row" style="margin-top:8px"><button class="btn" id="b-chk-apply">Applica</button><span class="hint" style="margin:0">Il file originale non viene toccato: cambia solo l'elenco qui sopra.</span></div>` : '') + `</div>`;
+  if ($('b-chk-apply')) $('b-chk-apply').onclick = applyCheck;
+}
+function runCheck(msg){ CHK = analizza(); renderCheck(msg); }
+function applyCheck(){
+  const C = CHK; if (!C) return;
+  if (v('g-atl') !== C.txt){ runCheck('⚠ L\'elenco è cambiato dopo il controllo: ecco il controllo aggiornato, ripeti le scelte.'); return; }
+  const M = memo(), W = C.W, togli = new Set(); let fatte = 0;
+  C.items.forEach((it, k) => {
+    const el = document.querySelector(`input[name="chk${k}"]:checked`); if (!el) return;
+    const s = el.value; fatte++;
+    if (it.tipo === 'inv' || it.tipo === 'gr'){
+      const r = W[it.i], prima = `${r[C.ic]} ${r[C.inn]}`;
+      if (s === 'si'){ W.forEach(x => { if (x[C.ic] === r[C.ic] && x[C.inn] === r[C.inn]){ x[C.ic] = it.to[0]; x[C.inn] = it.to[1]; } }); M.nomi[personKey(prima)] = it.to.slice(); }
+      else M.ignora.push(it.key);
+    } else if (it.tipo === 'dup'){
+      if (s === 'a') togli.add(it.b); else if (s === 'b') togli.add(it.a); else M.diversi.push(it.key);
+    } else if (it.tipo === 'asd'){
+      if (s === 'si'){ W.forEach(x => { if (x[C.ia] === it.val) x[C.ia] = it.to; }); M.asd[normASD(it.val)] = it.to; } else M.ignora.push(it.key);
+    } else if (it.tipo === 'asdg'){
+      if (s === 'no') M.ignora.push(it.key);
+      else { const to = it.vals[+s.slice(1)]; W.forEach(x => { if (it.vals.includes(x[C.ia])) x[C.ia] = to; }); it.vals.forEach(t => { if (t !== to) M.asd[normASD(t)] = to; }); }
+    }
+  });
+  store('alias', M);
+  const rows = W.filter((_, i) => !togli.has(i));
+  $('g-atl').value = [C.T.head].concat(rows).map(r => r.join('\t')).join('\n'); atlPreview(); saveForm();
+  runCheck(`✓ Applicate ${C.auto.length} sistemazioni automatiche e ${fatte} scelte` + (togli.size ? ` · ${togli.size} righe doppie tolte` : '') + '.');
+}
+$('b-chk').onclick = () => runCheck();
+
 /* Carica atleti: Excel con SheetJS (scaricato solo quando serve), CSV letto direttamente */
 const XLSX_URL = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
 let xlsxReady = null, ATL_BOOK = null;
@@ -849,9 +1048,15 @@ function loadRows(rows, soloCoppie){
   let R = rowsToTSV(rows).split('\n').map(l => l.split('\t'));
   if (!R.length || !R[0].some(Boolean)) throw new Error('il file è vuoto');
   if (isComCop(R[0])) R = coppieToRows(R), soloCoppie = true;
-  else if (soloCoppie && !R[0].some(h => /^(gara|tipo)/i.test(h))) throw new Error('non sembra il foglio coppie: servono le colonne COGNOME 1° CONC., NOME 1° CONC, COGNOME 2° CONC, NOME 2° CONC, CATEGORIA, ASD 1° CONC, ASD 2° CONC');
+  else if (soloCoppie){   // file misto (individuali e coppie): da "Carica coppie" si prendono solo le coppie
+    const it = R[0].findIndex(h => /^(gara|tipo)/i.test(h));
+    if (it < 0) throw new Error('non sembra il foglio coppie: servono le colonne COGNOME 1° CONC., NOME 1° CONC, COGNOME 2° CONC, NOME 2° CONC, CATEGORIA, ASD 1° CONC, ASD 2° CONC');
+    R = [R[0]].concat(R.slice(1).filter(r => /copp/i.test(r[it] || '')));
+    if (R.length < 2) throw new Error('nel file non ci sono coppie');
+  }
   R = mergeAtleti(withGenere(R), soloCoppie);
   $('g-atl').value = R.map(r => r.join('\t')).join('\n'); $('g-colp').value = $('g-colc').value = ''; atlPreview();
+  runCheck();
 }
 function showSheet(name){
   loadRows(XLSX.utils.sheet_to_json(ATL_BOOK.Sheets[name], {header:1, raw:false, defval:''}), false);
