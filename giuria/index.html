@@ -104,6 +104,7 @@ window.NWS_CIRCUITO = {
       <div style="grid-column:1/-1"><label for="g-atl">Atleti (facoltativo)</label>
         <div class="row" style="margin-bottom:6px">
           <label class="btn sec" style="margin:0">Carica atleti (Excel o CSV)<input id="atl-file" type="file" accept=".xlsx,.xls,.ods,.csv,.txt" hidden></label>
+          <label class="btn sec" style="margin:0">Carica coppie (foglio del comitato)<input id="cop-file" type="file" accept=".xlsx,.xls,.ods,.csv,.txt" hidden></label>
           <select id="atl-sheet" style="width:auto" hidden></select>
           <span class="hint" id="atl-load" style="margin:0"></span>
         </div>
@@ -113,7 +114,7 @@ window.NWS_CIRCUITO = {
           <label for="g-colc" style="margin:0">Colonna categoria</label><select id="g-colc" style="width:auto"></select>
         </div>
         <p class="hint" id="atl-info"></p></div>
-      <div style="grid-column:1/-1"><label>Pettorali e manche (individuali)</label>
+      <div style="grid-column:1/-1"><label>Pettorali e manche</label>
         <div class="row">
           <label for="g-p1" style="margin:0">Primo pettorale</label><input id="g-p1" type="number" min="1" value="1" style="width:80px">
           <label for="g-ord" style="margin:0">Ordine</label><select id="g-ord" style="width:auto">
@@ -122,12 +123,13 @@ window.NWS_CIRCUITO = {
           <label for="g-man" style="margin:0">Atleti per manche</label><input id="g-man" type="number" min="5" max="60" value="25" style="width:70px">
           <label for="g-max" style="margin:0">Massimo per manche</label><input id="g-max" type="number" min="5" max="60" value="30" style="width:70px">
           <label for="g-ris" style="margin:0">Riserve</label><input id="g-ris" type="number" min="0" max="30" value="5" style="width:60px">
+          <label for="g-pc" style="margin:0">Primo pettorale coppie</label><input id="g-pc" type="number" min="1" value="150" style="width:80px">
         </div>
         <div class="row" style="margin-top:8px">
           <button class="btn sec" id="b-assign">Assegna pettorali</button>
           <button class="btn sec" id="b-export">Scarica elenco con pettorali</button>
         </div>
-        <p class="hint" id="assign-info">Prima il Gruppo 1, poi gli indifferenti fino a riempire le prime due manche, poi il Gruppo 2, poi gli indifferenti rimasti. I pettorali già scritti nel file restano; le riserve vanno in coda all'ultima manche. Le sezioni si scrivono da sole, una per manche.</p></div>
+        <p class="hint" id="assign-info">Prima il Gruppo 1, poi gli indifferenti fino a riempire le prime due manche, poi il Gruppo 2, poi gli indifferenti rimasti. I pettorali già scritti nel file restano; le riserve vanno in coda all'ultima manche. Coppie dal primo pettorale coppie: prima istruttori e camminatori, poi le miste. Le sezioni si scrivono da sole.</p></div>
     </div>
     <div class="row" style="margin-top:12px">
       <button class="btn" id="b-gen">Genera schede</button>
@@ -195,7 +197,7 @@ window.NWS_CIRCUITO = {
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
 <script>
 'use strict';
-const VERSION = '0.5.5';
+const VERSION = '0.5.6';
 document.getElementById('ver').textContent = VERSION;
 const OPENCV_URL = 'https://cdn.jsdelivr.net/npm/@techstark/opencv-js@4.10.0-release.1/dist/opencv.js';
 
@@ -486,6 +488,8 @@ function coupleCat(c){
   if (c === 'MIX' || c === 'IC') return 'CI';
   return ['CC','CI','II'].includes(c) ? c : '';
 }
+const coppiaLab = c => { c = (c||'').trim(); if (/copp/i.test(c)) return /mist|mix/i.test(c) ? 'CI' : /istr/i.test(c) ? 'II' : /camm/i.test(c) ? 'CC' : ''; return coupleCat(c); };
+const COP_NOMI = {II: 'Coppia Istruttori', CC: 'Coppia Camminatori', CI: 'Coppia Mista'};
 const catLabel = c => c.length === 2 ? c[0] + '/' + c[1] : c;   // CI → C/I
 /* categoria del singolo atleta: Camminatrice/Camminatore = C, Istruttrice/Istruttore = I */
 const oneCat = c => /^(c|camm)/i.test((c||'').trim()) ? 'C' : /^(i|istr)/i.test((c||'').trim()) ? 'I' : '';
@@ -547,7 +551,19 @@ function assignBibs(confirmed){
   const ig = find(/partenz|gruppo/i), it = find(/^(gara|tipo)/i), ic = find(/^cognome/i), inn = find(/^nome/i);
   const isCop = r => it >= 0 && /copp/i.test(r[it] || '');
   const ind = T.rows.filter(r => !isCop(r)), cop = T.rows.filter(isCop);
-  const bib = r => bibOf(r, ip);
+  const bib = r => bibOf(r, ip), icat = find(/^cat/i);
+  // coppie: righe con lo stesso pettorale = una coppia; senza pettorale, due righe consecutive
+  const units = [], byB = {};
+  cop.forEach(r => { const b = bib(r); if (b){ if (!byB[b]) units.push(byB[b] = {b, rows: []}); byB[b].rows.push(r); } });
+  const nob = cop.filter(r => !bib(r)); for (let i = 0; i < nob.length; i += 2) units.push({b: 0, rows: nob.slice(i, i + 2)});
+  const uname = u => u.rows.map(r => `${r[ic] || ''} ${r[inn] || ''}`.trim()).join(' / ');
+  units.forEach(u => {
+    if (u.rows.length !== 2) throw new Error(`coppia ${u.b ? 'con pettorale ' + u.b : uname(u)}: ${u.rows.length} atleti invece di 2. Correggi il file e ricarica`);
+    const two = u.rows.every(r => oneCat(r[icat])) ? coupleCat(u.rows.map(r => oneCat(r[icat])).sort().join('')) : '';
+    u.cat = coppiaLab(u.rows[0][icat]) || two; u.fase = u.cat === 'CI' ? 2 : 1;
+    if (!u.cat) throw new Error(`coppia ${uname(u)}: categoria "${u.rows[0][icat] || ''}" non riconosciuta (Istruttori, Camminatori o Mista)`);
+  });
+  const ckept = units.filter(u => u.b), ctodo = units.filter(u => !u.b);
   // pettorali scritti male o doppi tra gli individuali: ci si ferma
   const bad = ind.filter(r => String(r[ip] || '').trim() && !bib(r)).map(r => `"${r[ip]}"`);
   if (bad.length) throw new Error(`pettorali non validi: ${bad.slice(0, 5).join(', ')}. Correggi il file e ricarica`);
@@ -558,6 +574,7 @@ function assignBibs(confirmed){
   const note = [];
   if (ig < 0 && todo.length) note.push('colonna della partenza (Gruppo 1, Gruppo 2, Indifferente) non trovata: tutti gli atleti saranno trattati come indifferenti');
   if (kept.length && todo.length) note.push(`${kept.length} pettorali già scritti nel file restano come sono; ne vengono assegnati ${todo.length}, saltando i numeri già usati`);
+  if (ckept.length && ctodo.length) note.push(`coppie: ${ckept.length} pettorali già scritti restano; ne vengono assegnati ${ctodo.length}`);
   if (note.length && !confirmed) return {ask: note};
   const ord = v('g-ord'), col = ord.replace('-', '') === 'nome' ? inn : ic, dir = ord[0] === '-' ? -1 : 1;
   const sort = a => ord === 'caso' ? a.map(r => [Math.random(), r]).sort((x, y) => x[0] - y[0]).map(x => x[1])
@@ -578,17 +595,27 @@ function assignBibs(confirmed){
   const sez = []; let k = 0;
   sizes.forEach((m, i) => { const ch = all.slice(k, k + m).concat(i === sizes.length - 1 ? ris : []); k += m;
     sez.push(`IND | Manche ${i+1} | ${ranges(ch).join(', ')}`); });
-  const pc = [...new Set(cop.map(bib).filter(Boolean))];
-  const clash = pc.filter(p => used.has(p) || ris.includes(p));
+  const clash = ckept.map(u => u.b).filter(p => used.has(p) || ris.includes(p));
   if (clash.length) throw new Error(`i pettorali ${clash.join(', ')} sono sia di un individuale (o riserva) sia di una coppia: cambia il primo pettorale o i numeri delle coppie`);
-  if (pc.length) sez.push(`COP | Coppie | ${ranges(pc).join(', ')}`);
+  // coppie da assegnare: fase 1 istruttori e camminatori, fase 2 miste; poi per cognome
+  const pc1 = Math.max(1, +v('g-pc') || 150), usedC = new Set([...used, ...ris, ...ckept.map(u => u.b)]);
+  const fr = (r, i) => String(r[i] || '');
+  ctodo.sort((x, y) => x.fase - y.fase || (x.cat === y.cat ? 0 : x.cat === 'II' ? -1 : 1) ||
+    fr(x.rows[0], ic).localeCompare(fr(y.rows[0], ic), 'it', {sensitivity:'base'}) || fr(x.rows[0], inn).localeCompare(fr(y.rows[0], inn), 'it'));
+  let q = pc1; ctodo.forEach(u => { while (usedC.has(q)) q++; u.b = q; usedC.add(q); u.rows.forEach(r => r[ip] = String(q)); });
+  const f1 = units.filter(u => u.fase === 1).map(u => u.b), f2 = units.filter(u => u.fase === 2).map(u => u.b);
+  if (f1.length) sez.push(`COP | Coppie Istruttori e Camminatori | ${ranges(f1).join(', ')}`);
+  if (f2.length) sez.push(`COP | Coppie Miste | ${ranges(f2).join(', ')}`);
+  const cb = units.map(u => u.b).sort((a, b) => a - b), copMsg = !units.length ? '' :
+    ` · coppie: ${f1.length} istruttori/camminatori + ${f2.length} mist${f2.length === 1 ? 'a' : 'e'}, pettorali ${cb[0]}–${cb[cb.length-1]}` +
+    (ckept.length && ctodo.length ? ` (${ckept.length} dal file)` : '') + (ctodo.length && usedC.size && [...used, ...ris].includes(pc1) ? ` ⚠ il ${pc1} era già usato: le coppie partono dal primo numero libero` : '');
   $('g-atl').value = [H].concat(T.rows).map(r => r.join('\t')).join('\n'); $('g-sez').value = sez.join('\n');
   atlPreview();
   const g2s = g2.length + kept.filter(r => grp(r) === 2).length;
   return `Gruppo 1: ${g1n} scelti + ${fill.length} indifferenti · Gruppo 2: ${g2s} scelti` + (rest.length ? ` + ${rest.length} indifferenti in coda` : '') +
     (kept.length ? ` · ${kept.length} pettorali del file mantenuti` : '') +
     ` · ${sizes.length} manche (${sizes.join(', ')}), pettorali ${all[0]}–${last}` + (ris.length ? ` · riserve ${ris[0]}–${ris[ris.length-1]}` : '') +
-    (cop.length ? ` · coppie: ${pc.length} pettorali dal file` + (cop.some(r => !bib(r)) ? ' ⚠ alcune coppie senza pettorale' : '') : '') +
+    copMsg +
     (g1n > cap1 ? ` · il Gruppo 1 sfora nella 3ª manche` : '') + (sizes.some(m => m + (m === sizes[sizes.length-1] ? ris.length : 0) > G.NR) ? ` · le manche oltre ${G.NR} righe si stampano su due fogli` : '');
 }
 /* decimali per le parità: capo sempre primo, poi fino a 4 giudici a scelta (totale, solo 1° o solo 2° giro) */
@@ -618,7 +645,7 @@ function readGara(){
     if (sec.type === 'IND'){ if (x && x.cat) a.cat = x.cat; return; }
     // coppia su due righe: la categoria nasce dai due atleti (Camminatore + Istruttrice = C/I)
     const two = x && x.cats.length === 2 && x.cats.every(oneCat) ? coupleCat(x.cats.map(oneCat).sort().join('')) : '';
-    const ca = two || (x && x.cat ? coupleCat(x.cat) : '');
+    const ca = (x && coppiaLab(x.cat)) || two;
     if (x && x.cat && !ca) throw new Error(`Atleti: pettorale ${a.p}, categoria "${x.cat}" non valida per le coppie (CC, CI o II)`);
     if (a.cat && ca && a.cat !== ca) throw new Error(`Pettorale ${a.p}: categoria ${catLabel(a.cat)} nelle sezioni ma ${catLabel(ca)} nell'elenco atleti`);
     a.cat = a.cat || ca;
@@ -690,7 +717,7 @@ if (window.NWS_CIRCUITO){
   atlPreview();   // riempie i menu delle colonne, poi rimette la scelta salvata
   if (s){ $('g-colp').value = s['g-colp'] || ''; $('g-colc').value = s['g-colc'] || ''; atlPreview(); }
 })();
-function saveForm(){ const f = {}; ['g-tappa','g-code','g-data','g-ng','g-nc','g-var','g-prove','g-sez','g-atl','g-colp','g-colc','g-p1','g-ord','g-man','g-max','g-ris','g-stage', ...[...Array(NDEC)].flatMap((_, i) => ['g-dj' + i, 'g-dg' + i])].forEach(k => f[k] = v(k)); store('form', f); }
+function saveForm(){ const f = {}; ['g-tappa','g-code','g-data','g-ng','g-nc','g-var','g-prove','g-sez','g-atl','g-colp','g-colc','g-p1','g-ord','g-man','g-max','g-ris','g-pc','g-stage', ...[...Array(NDEC)].flatMap((_, i) => ['g-dj' + i, 'g-dg' + i])].forEach(k => f[k] = v(k)); store('form', f); }
 /* anteprima dell'elenco atleti: colonne riconosciute e menu per sceglierle a mano */
 function atlPreview(){
   if (assignAsk){ assignAsk = null; $('b-assign').textContent = 'Assegna pettorali'; $('assign-info').textContent = ''; }
@@ -713,15 +740,31 @@ $('b-assign').onclick = () => {
     reset(); $('assign-info').textContent = '✓ ' + r; saveForm();
   } catch(e){ reset(); $('assign-info').textContent = '⚠ ' + e.message; }
 };
-// elenco per la segreteria: tutte le colonne più la manche di ogni pettorale (funziona dal PC)
+// elenco per la segreteria con le colonne del comitato: un foglio per gli individuali e uno per le coppie
+function exportRows(){
+  const T = atlTable(v('g-atl')); if (!T) throw new Error('nessun elenco atleti');
+  const H = T.head, f = re => H.findIndex(h => re.test(h)), g = (r, i) => i >= 0 ? (r[i] || '') : '';
+  const ip = v('g-colp') !== '' ? +v('g-colp') : f(PETT_RE), ic = f(/^cognome/i), inn = f(/^nome/i), icat = f(/^cat/i),
+        ia = f(/asd|societ|squadra|club/i), ig = f(/^(genere|sesso)$/i), it = f(/^(gara|tipo)/i);
+  const num = c => /^\d+$/.test(c) ? +c : c, isCop = r => it >= 0 && /copp/i.test(r[it] || '');
+  const base = c => /^istr/i.test(c) ? 'Istruttore' : /^camm/i.test(c) ? 'Camminatore' : c;
+  // genere: quello del file così com'è scritto (Maschile/Femminile o M/F); se manca, dalla categoria
+  const gen = r => ig >= 0 ? g(r, ig) : /^(istruttric|camminatric)/i.test(g(r, icat)) ? 'Femminile' : /^(istrutt|cammin)/i.test(g(r, icat)) ? 'Maschile' : '';
+  const byP = (a, b) => (typeof a[0] === 'number' ? a[0] : 1e9) - (typeof b[0] === 'number' ? b[0] : 1e9);
+  const ind = T.rows.filter(r => !isCop(r)).map(r => [num(g(r, ip)), g(r, ic), g(r, inn), gen(r), base(g(r, icat)), g(r, ia)]).sort(byP);
+  const cop = T.rows.filter(isCop), cu = [], byB = {};
+  cop.forEach(r => { const p = g(r, ip); if (p){ if (!byB[p]) cu.push(byB[p] = []); byB[p].push(r); } });
+  const nob = cop.filter(r => !g(r, ip)); for (let i = 0; i < nob.length; i += 2) cu.push(nob.slice(i, i + 2));
+  const copRows = cu.map(([a, b = []]) => { const c = g(a, icat), two = [a, b].every(r => oneCat(g(r, icat))) ? coupleCat([a, b].map(r => oneCat(g(r, icat))).sort().join('')) : '';
+    return [num(g(a, ip)), g(a, ic), g(a, inn), g(b, ic), g(b, inn), /copp/i.test(c) ? c : COP_NOMI[coppiaLab(c) || two] || c, g(a, ia), g(b, ia)]; }).sort(byP);
+  return {ind: [['Pettorale', 'Cognome', 'Nome', 'Genere', 'Categoria', 'ASD']].concat(ind),
+          cop: copRows.length ? [['PETTORALE', 'COGNOME 1° CONC.', 'NOME 1° CONC', 'COGNOME 2° CONC', 'NOME 2° CONC', 'CATEGORIA', 'ASD 1° CONC', 'ASD 2° CONC']].concat(copRows) : null};
+}
 $('b-export').onclick = async () => {
   try {
-    const T = atlTable(v('g-atl')); if (!T) throw new Error('nessun elenco atleti');
-    const ip = v('g-colp') !== '' ? +v('g-colp') : T.head.findIndex(h => PETT_RE.test(h));
-    const man = {}; parseSezioni(v('g-sez')).forEach(sec => sec.atl.forEach(a => man[a.p] = sec.nome));
-    const X = await loadXLSX(), num = c => /^\d+$/.test(c) ? +c : c;
-    const rows = [T.head.concat('Manche')].concat(T.rows.map(r => r.map(num).concat(man[parseInt(r[ip], 10)] || '')));
-    const wb = X.utils.book_new(); X.utils.book_append_sheet(wb, X.utils.aoa_to_sheet(rows), 'Pettorali');
+    const E = exportRows(), X = await loadXLSX(), wb = X.utils.book_new();
+    X.utils.book_append_sheet(wb, X.utils.aoa_to_sheet(E.ind), 'Individuali');
+    if (E.cop) X.utils.book_append_sheet(wb, X.utils.aoa_to_sheet(E.cop), 'Coppie');
     X.writeFile(wb, `pettorali_${v('g-code') || 'gara'}.xlsx`);
   } catch(e){ $('assign-info').textContent = '⚠ ' + e.message; }
 };
@@ -761,28 +804,84 @@ const rowsToTSV = rows => {
   privTolte = h.length - keep.length;
   return rows.map(r => keep.map(i => r[i] ?? '').join('\t')).join('\n');
 };
+/* foglio coppie del comitato (una riga per coppia: COGNOME 1° CONC., NOME 1° CONC, … ASD 2° CONC):
+   diventa due righe, una per atleta, con Gara = Coppia e lo stesso pettorale */
+const isComCop = h => h.some(x => /cognome.*1/i.test(x)) && h.some(x => /cognome.*2/i.test(x));
+function coppieToRows(rows){
+  const h = rows[0], f = re => h.findIndex(x => re.test(x)), g = (r, i) => i >= 0 ? (r[i] || '') : '';
+  const ip = f(PETT_RE), c1 = f(/cognome.*1/i), n1 = f(/^nome.*1/i), c2 = f(/cognome.*2/i), n2 = f(/^nome.*2/i),
+        ic = f(/^cat/i), a1 = f(/(asd|societ).*1/i), a2 = f(/(asd|societ).*2/i);
+  if ([c1, n1, c2, n2].some(i => i < 0)) throw new Error('foglio coppie: servono cognome e nome del 1° e del 2° concorrente');
+  const out = [['Pettorale', 'Cognome', 'Nome', 'Categoria', 'ASD', 'Gara']];
+  rows.slice(1).forEach(r => { const p = g(r, ip), cat = g(r, ic);
+    out.push([p, g(r, c1), g(r, n1), cat, g(r, a1), 'Coppia'], [p, g(r, c2), g(r, n2), cat, g(r, a2), 'Coppia']); });
+  return out;
+}
+/* Genere (Maschile/Femminile o M/F) + Categoria (Istruttore/Camminatore) → Istruttrice, Camminatore… */
+function withGenere(rows){
+  const h = rows[0], ig = h.findIndex(x => /^(genere|sesso)$/i.test(x)), ic = h.findIndex(x => /^cat/i.test(x)), it = h.findIndex(x => /^(gara|tipo)/i.test(x));
+  if (ig < 0 || ic < 0) return rows;
+  rows.slice(1).forEach(r => {
+    if (it >= 0 && /copp/i.test(r[it] || '')) return;
+    const F = /^(f|femm|donna)/i.test((r[ig] || '').trim()), M = /^(m|masc|uomo)/i.test((r[ig] || '').trim()), c = r[ic] || '';
+    if (/^istrutt/i.test(c)) r[ic] = F ? 'Istruttrice' : M ? 'Istruttore' : c;
+    else if (/^cammin/i.test(c)) r[ic] = F ? 'Camminatrice' : M ? 'Camminatore' : c;
+  });
+  return rows;
+}
+/* unione con l'elenco già presente: "Carica coppie" sostituisce solo le coppie,
+   "Carica atleti" sostituisce tutto, ma tiene le coppie se il nuovo file non ne contiene */
+function mergeAtleti(NR, soloCoppie){
+  const cur = atlTable(v('g-atl')), key = h => String(h).toLowerCase().replace(/[^a-z0-9]/g, '');
+  const copOf = H => { const it = H.findIndex(h => /^(gara|tipo)/i.test(h)); return r => it >= 0 && /copp/i.test(r[it] || ''); };
+  const NH = NR[0], nCop = copOf(NH), nuovoHaCoppie = NR.slice(1).some(nCop);
+  if (!cur || !cur.rows.length) return NR;
+  const cCop = copOf(cur.head), keep = cur.rows.filter(r => soloCoppie ? !cCop(r) : !nuovoHaCoppie && cCop(r));
+  if (!keep.length) return NR;
+  const H = cur.head.slice(); NH.forEach(h => { if (!H.some(x => key(x) === key(h))) H.push(h); });
+  if (!H.some(h => /^(gara|tipo)/i.test(h))) H.push('Gara');
+  const map = (SH, isC) => r => H.map(h => { const i = SH.findIndex(x => key(x) === key(h)); return i >= 0 ? (r[i] || '') : /^(gara|tipo)/i.test(h) ? (isC(r) ? 'Coppia' : 'Individuale') : ''; });
+  const righe = keep.map(map(cur.head, cCop)).concat(NR.slice(1).map(map(NH, nCop)));
+  const gi = H.findIndex(h => /^(gara|tipo)/i.test(h)), isC = r => /copp/i.test(r[gi] || '');
+  return [H].concat(righe.filter(r => !isC(r)), righe.filter(isC));   // prima gli individuali
+}
+function loadRows(rows, soloCoppie){
+  let R = rowsToTSV(rows).split('\n').map(l => l.split('\t'));
+  if (!R.length || !R[0].some(Boolean)) throw new Error('il file è vuoto');
+  if (isComCop(R[0])) R = coppieToRows(R), soloCoppie = true;
+  else if (soloCoppie && !R[0].some(h => /^(gara|tipo)/i.test(h))) throw new Error('non sembra il foglio coppie: servono le colonne COGNOME 1° CONC., NOME 1° CONC, COGNOME 2° CONC, NOME 2° CONC, CATEGORIA, ASD 1° CONC, ASD 2° CONC');
+  R = mergeAtleti(withGenere(R), soloCoppie);
+  $('g-atl').value = R.map(r => r.join('\t')).join('\n'); $('g-colp').value = $('g-colc').value = ''; atlPreview();
+}
 function showSheet(name){
-  const rows = XLSX.utils.sheet_to_json(ATL_BOOK.Sheets[name], {header:1, raw:false, defval:''});
-  $('g-atl').value = rowsToTSV(rows); $('g-colp').value = $('g-colc').value = ''; atlPreview();
+  loadRows(XLSX.utils.sheet_to_json(ATL_BOOK.Sheets[name], {header:1, raw:false, defval:''}), false);
+}
+async function fileRows(f){
+  if (/\.(csv|txt)$/i.test(f.name)){
+    let t = await f.text(); if (t.includes('�')) t = new TextDecoder('windows-1252').decode(await f.arrayBuffer());   // CSV salvato da Excel italiano
+    return {rows: parseCSV(t)};
+  }
+  const X = await loadXLSX(), book = X.read(await f.arrayBuffer(), {type:'array'});
+  return {book, rows: X.utils.sheet_to_json(book.Sheets[book.SheetNames[0]], {header:1, raw:false, defval:''})};
 }
 $('atl-file').onchange = async e => {
   const f = e.target.files[0]; e.target.value = ''; if (!f) return;
   $('atl-load').textContent = `Lettura di ${f.name}…`; $('atl-sheet').hidden = true; ATL_BOOK = null;
   try {
-    if (/\.(csv|txt)$/i.test(f.name)){
-      let t = await f.text(); if (t.includes('\ufffd')) t = new TextDecoder('windows-1252').decode(await f.arrayBuffer());   // CSV salvato da Excel italiano
-      $('g-atl').value = rowsToTSV(parseCSV(t)); $('g-colp').value = $('g-colc').value = ''; atlPreview();
-    } else {
-      const X = await loadXLSX();
-      ATL_BOOK = X.read(await f.arrayBuffer(), {type:'array'});
-      const names = ATL_BOOK.SheetNames, sel = $('atl-sheet');
-      sel.innerHTML = names.map(n => `<option>${esc(n)}</option>`).join(''); sel.hidden = names.length < 2;
-      showSheet(names[0]);
-    }
+    const F = await fileRows(f);
+    if (F.book){ ATL_BOOK = F.book; const names = ATL_BOOK.SheetNames, sel = $('atl-sheet');
+      sel.innerHTML = names.map(n => `<option>${esc(n)}</option>`).join(''); sel.hidden = names.length < 2; }
+    loadRows(F.rows, false);
     $('atl-load').textContent = `✓ ${f.name}` + (privTolte ? ` · ${privTolte} colonne di contatti (telefono, email) scartate` : '') + ($('atl-sheet').hidden ? '' : ' · scegli il foglio:');
   } catch(err){ $('atl-load').textContent = `⚠ ${f.name}: ${err.message}`; }
 };
 $('atl-sheet').onchange = () => showSheet(v('atl-sheet'));
+$('cop-file').onchange = async e => {
+  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  $('atl-load').textContent = `Lettura di ${f.name}…`;
+  try { loadRows((await fileRows(f)).rows, true); $('atl-load').textContent = `✓ coppie da ${f.name}` + (privTolte ? ` · ${privTolte} colonne di contatti (telefono, email) scartate` : ''); }
+  catch(err){ $('atl-load').textContent = `⚠ ${f.name}: ${err.message}`; }
+};
 $('b-gen').onclick = () => {
   let gara;
   try { gara = readGara(); } catch(e){ $('gen-info').textContent = '⚠ ' + e.message; return; }
